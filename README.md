@@ -70,7 +70,7 @@ Supported language constructs fall within ANSI C and initial external compilatio
 C compiler. While common language constructs (structs, pointers, indirection etc.) are implemented due
 to the simplicity of the compiler (no preprocessor, AST nor a formalised parser) it doesn't implement full ANSI C syntax.
 
-Compiler sequentally translates C source code into IL and then binary meaning instruction order is preserved from C source
+Compiler sequentially translates C source code into IL and then binary meaning instruction order is preserved from C source
 all the way to the binary with only jumps and glue logic being inserted. This makes some language constructs
 (for example for loops or some comparisons) quite inefficient due to excessive jumps but compiler's design stays very simple.
 
