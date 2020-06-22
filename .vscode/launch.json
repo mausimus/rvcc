@@ -1,0 +1,35 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Debug",
+			"type": "cppdbg",
+			"request": "launch",
+			"args": [
+				"-o",
+				"bin/rvcc.elf",
+				"src/rvcc.c"
+			],
+			"stopAtEntry": false,
+			"cwd": "${workspaceFolder}",
+			"environment": [],
+			"externalConsole": true,
+			"linux": {
+				"MIMode": "gdb",
+				"miDebuggerPath": "gdb",
+				"program": "${workspaceFolder}/bin/rvcc",
+			},
+			"osx": {
+				"MIMode": "lldb",
+				"miDebuggerPath": "lldb-mi",
+				"program": "${workspaceFolder}/bin/rvcc"
+			},
+			"windows": {
+				"MIMode": "gdb",
+				"miDebuggerPath": "gdb.exe",
+				"program": "${workspaceFolder}/bin/rvcc.exe"
+			},
+			"preLaunchTask": "build"
+		}
+	]
+}
