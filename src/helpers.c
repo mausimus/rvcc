@@ -1,3 +1,5 @@
+/* rvcc C compiler - misc helpers */
+
 void str_trim(char *s)
 {
 	int i = 0;

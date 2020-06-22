@@ -1,3 +1,5 @@
+/* rvcc C compiler - definitions */
+
 #include <stdio.h>
 #include <stdlib.h>
 

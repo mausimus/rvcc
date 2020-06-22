@@ -1,3 +1,5 @@
+/* rvcc C compiler - barebones clib implementation */
+
 #define NULL 0
 
 typedef int FILE; /* TODO: struct */

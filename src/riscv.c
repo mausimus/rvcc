@@ -1,3 +1,5 @@
+/* rvcc C compiler - RISC-V ISA encoder */
+
 int r_extract_bits(int imm, int i_start, int i_end, int d_start, int d_end)
 {
 	int v;
