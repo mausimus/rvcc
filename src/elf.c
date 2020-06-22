@@ -1,3 +1,5 @@
+/* rvcc C compiler - ELF file generator */
+
 #include <stdio.h>
 #include <stdlib.h>
 

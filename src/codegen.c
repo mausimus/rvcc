@@ -1,3 +1,5 @@
+/* rvcc C compiler - IL->binary code generator */
+
 #include <stdio.h>
 #include <stdlib.h>
 

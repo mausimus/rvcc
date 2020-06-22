@@ -1,3 +1,5 @@
+/* rvcc C compiler - global structures */
+
 block_def *_blocks;
 int _blocks_idx;
 

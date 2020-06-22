@@ -1,3 +1,5 @@
+/* rvcc C compiler - source code loader */
+
 #include <stdio.h>
 #include <string.h>
 

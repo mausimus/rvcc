@@ -1,3 +1,4 @@
+/* rvcc C compiler - lexer */
 
 void l_skip_whitespace()
 {
