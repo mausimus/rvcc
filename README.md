@@ -13,8 +13,7 @@ Bootstrapped C compiler for 32-bit RISC-V ISA
 
 ### Bootstrapping
 
-Bootstrapped compiler is a compiler that's able to compile its own source code, which is an important stepping stone
-in confirming expressiveness. Since rvcc is written in ANSI C, we can use any compiler on any platform for the initial compilation before bootstrapping with the help of a RISC-V emulator.
+Bootstrapped compiler is a compiler that's able to compile its own source code, which is an important step in verification. Since rvcc is written in ANSI C, we can use any compiler on any platform for the initial compilation before bootstrapping with the help of a RISC-V emulator.
 
 ![diagram](bootstrap.png)
 
