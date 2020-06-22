@@ -1,0 +1,13 @@
+{
+	"files.associations": {
+		"*.h": "cpp",
+		"*.inc": "c",
+		"typeinfo": "c",
+		"cmath": "c",
+		"cstdio": "c",
+		"cstdlib": "c",
+		"limits": "c",
+		"*.tcc": "c",
+		"type_traits": "c"
+	}
+}
