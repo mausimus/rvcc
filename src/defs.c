@@ -29,6 +29,8 @@
 #define ELF_START 0x10000
 #define PTR_SIZE 4
 
+typedef enum { a_riscv, a_arm } arch_t;
+
 /* IL operation definitions */
 typedef enum {
 	/* generic - fixed assembly instruction */
@@ -92,7 +94,7 @@ typedef enum {
 /* builtin types */
 typedef enum { bt_void = 0, bt_int = 1, bt_char = 2, bt_struct = 3 } base_type;
 
-/* RISC-V ISA opcodes */
+/* RISC-V opcodes */
 typedef enum {
 	/* R type */
 	ri_add = 51 /* 0b110011 + (0 << 12) */,
@@ -178,6 +180,65 @@ typedef enum {
 	r_t5 = 30,
 	r_t6 = 31
 } r_reg;
+
+/* ARMv7 opcodes */
+typedef enum {
+	ar_and = 0,
+	ar_eor = 1,
+	ar_sub = 2,
+	ar_rsb = 3,
+	ar_add = 4,
+	ar_adc = 5,
+	ar_sbc = 6,
+	ar_rsc = 7,
+	ar_tst = 8,
+	ar_teq = 9,
+	ar_cmp = 10,
+	ar_cmn = 11,
+	ar_orr = 12,
+	ar_mov = 13,
+	ar_bic = 14,
+	ar_mvn = 15
+} ar_op;
+
+/* ARMv7 conditions */
+typedef enum {
+	ac_eq = 0,
+	ac_ne = 1,
+	ac_cs = 2,
+	ac_cc = 3,
+	ac_mi = 4,
+	ac_pl = 5,
+	ac_vs = 6,
+	ac_vc = 7,
+	ac_hi = 8,
+	ac_ls = 9,
+	ac_ge = 10,
+	ac_lt = 11,
+	ac_gt = 12,
+	ac_le = 13,
+	ac_al = 14
+} ar_cond;
+
+/* ARMv7 registers */
+typedef enum {
+	a_r0 = 0,
+	a_r1 = 1,
+	a_r2 = 2,
+	a_r3 = 3,
+	a_r4 = 4,
+	a_r5 = 5,
+	a_r6 = 6,
+	a_r7 = 7,
+	a_r8 = 8,
+	a_r9 = 9,
+	a_r10 = 10,
+	a_s0 = 11, /* r11 */
+	a_r12 = 12,
+	a_sp = 13,
+	a_lr = 14,
+	a_pc = 15
+} a_reg;
 
 /* lexer tokens */
 typedef enum {

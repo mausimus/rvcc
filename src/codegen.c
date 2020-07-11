@@ -3,6 +3,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+int c_dest_reg(int param_no, arch_t arch)
+{
+	if (arch == a_arm) {
+		return param_no;
+	}
+	return param_no + 10;
+}
+
 /* calculates stack space needed for function's parameters */
 void c_size_function(function_def *fn)
 {
@@ -88,7 +96,7 @@ void c_size_functions(int data_start)
 }
 
 /* returns expected binary length of an IL instruction in bytes */
-int c_get_code_length(il_instr *ii)
+int c_get_code_length(il_instr *ii, arch_t arch)
 {
 	il_op op = ii->op;
 
@@ -104,7 +112,7 @@ int c_get_code_length(il_instr *ii)
 		return 8;
 	}
 	if (op == op_function_call) {
-		if (ii->param_no + 10 != r_a0) {
+		if (ii->param_no != 0) {
 			return 8;
 		}
 		return 4;
@@ -122,6 +130,9 @@ int c_get_code_length(il_instr *ii)
 		return 4;
 	}
 	if (op == op_load_numeric_constant) {
+		if (arch == a_arm)
+			return 8;
+
 		if (ii->int_param1 > -2048 && ii->int_param1 < 2047) {
 			return 4;
 		}
@@ -185,24 +196,24 @@ void c_emit(int code)
 }
 
 /* calculates total binary code length based on IL ops */
-int c_calculate_code_length()
+int c_calculate_code_length(arch_t arch)
 {
 	int code_len = 0, i;
 	for (i = 0; i < _il_idx; i++) {
 		_il[i].code_offset = code_len;
-		_il[i].op_len = c_get_code_length(&_il[i]);
+		_il[i].op_len = c_get_code_length(&_il[i], arch);
 		code_len += _il[i].op_len;
 	}
 	return code_len;
 }
 
 /* main code generation loop */
-void c_generate()
+void c_generate(arch_t arch)
 {
 	int i, data_start, code_start;
 
 	code_start = _e_code_start; /* ELF headers size */
-	data_start = c_calculate_code_length();
+	data_start = c_calculate_code_length(arch);
 	c_size_functions(code_start + data_start);
 
 	for (i = 0; i < _il_idx; i++) {
@@ -224,28 +235,44 @@ void c_generate()
 		if (op == op_load_data_address) {
 			/* lookup address of a constant in data section as offset from PC */
 			int ofs = data_start + ii->int_param1 - pc;
-			int dest_reg = ii->param_no + 10;
+			int dest_reg = c_dest_reg(ii->param_no, arch);
 
-			c_emit(r_auipc(dest_reg, r_hi(ofs)));
-			c_emit(r_addi(dest_reg, dest_reg, r_lo(ofs)));
+			if (arch == a_arm) {
+				if (ofs >= 0) {
+					c_emit(a_add_i(ac_al, dest_reg, a_pc, a_hi(ofs)));
+					c_emit(a_add_i(ac_al, dest_reg, dest_reg, a_lo(ofs)));
+				} else {
+					ofs = -ofs;
+					c_emit(a_sub_i(ac_al, dest_reg, a_pc, a_hi(ofs)));
+					c_emit(a_sub_i(ac_al, dest_reg, dest_reg, a_lo(ofs)));
+				}
+			} else {
+				c_emit(r_auipc(dest_reg, r_hi(ofs)));
+				c_emit(r_addi(dest_reg, dest_reg, r_lo(ofs)));
+			}
 
 			printf("  x%d := &data[%d]", dest_reg, ii->int_param1);
 		}
 		if (op == op_load_numeric_constant) {
 			/* load numeric constant */
 			int val = ii->int_param1;
-			int dest_reg = ii->param_no + 10;
-			if (val > -2048 && val < 2047) {
-				c_emit(r_addi(dest_reg, r_zero, r_lo(val)));
+			int dest_reg = c_dest_reg(ii->param_no, arch);
+			if (arch == a_arm) {
+				c_emit(a_movw(ac_al, dest_reg, val));
+				c_emit(a_movt(ac_al, dest_reg, val));
 			} else {
-				c_emit(r_lui(dest_reg, r_hi(val)));
-				c_emit(r_addi(dest_reg, dest_reg, r_lo(val)));
+				if (val > -2048 && val < 2047) {
+					c_emit(r_addi(dest_reg, r_zero, r_lo(val)));
+				} else {
+					c_emit(r_lui(dest_reg, r_hi(val)));
+					c_emit(r_addi(dest_reg, dest_reg, r_lo(val)));
+				}
 			}
 			printf("  x%d := %d", dest_reg, ii->int_param1);
 		}
 		if (op == op_get_var_addr) {
 			/* lookup address of a variable */
-			int dest_reg = ii->param_no + 10;
+			int dest_reg = c_dest_reg(ii->param_no, arch);
 			int offset;
 
 			var = find_global_variable(ii->string_param1);
@@ -255,6 +282,7 @@ void c_generate()
 
 				c_emit(r_auipc(dest_reg, r_hi(ofs)));
 				offset = r_lo(ofs);
+				c_emit(r_addi(dest_reg, dest_reg, offset));
 			} else {
 				/* need to find the variable offset on stack, i.e. from s0 */
 				var = find_local_variable(ii->string_param1, bd);
@@ -263,9 +291,9 @@ void c_generate()
 				}
 				offset = -var->offset;
 				c_emit(r_addi(dest_reg, r_s0, 0));
+				c_emit(r_addi(dest_reg, dest_reg, offset));
 			}
 
-			c_emit(r_addi(dest_reg, dest_reg, offset));
 			printf("  x%d = &%s", dest_reg, ii->string_param1);
 		}
 		if (op == op_read_addr) {
@@ -315,13 +343,17 @@ void c_generate()
 			int jump_location = jump_instr->code_offset;
 			int ofs = jump_location - pc;
 
-			c_emit(r_jal(r_zero, ofs));
+			if (arch == a_arm) {
+				c_emit(a_b(ac_al, ofs));
+			} else {
+				c_emit(r_jal(r_zero, ofs));
+			}
 
 			printf("  return %s", ii->string_param1);
 		}
 		if (op == op_function_call) {
 			/* function call */
-			int dest_reg = ii->param_no + 10;
+			int dest_reg = c_dest_reg(ii->param_no, arch);
 			int ofs;
 			int jump_instr_index;
 			il_instr *jump_instr;
@@ -335,9 +367,16 @@ void c_generate()
 			jump_location = jump_instr->code_offset;
 			ofs = jump_location - pc;
 
-			c_emit(r_jal(r_ra, ofs));
-			if (dest_reg != r_a0) {
-				c_emit(r_addi(dest_reg, r_a0, 0));
+			if (arch == a_arm) {
+				c_emit(a_bl(ac_al, ofs));
+				if (dest_reg != a_r0) {
+					c_emit(a_mov_r(ac_al, dest_reg, a_r0));
+				}
+			} else {
+				c_emit(r_jal(r_ra, ofs));
+				if (dest_reg != r_a0) {
+					c_emit(r_addi(dest_reg, r_a0, 0));
+				}
 			}
 
 			printf("  x%d := %s() @ %d", dest_reg, ii->string_param1, fn->entry_point);
@@ -360,10 +399,17 @@ void c_generate()
 		}
 		if (op == op_exit_point) {
 			/* restore previous frame */
-			c_emit(r_addi(r_sp, r_s0, 16));
-			c_emit(r_lw(r_ra, r_sp, -8));
-			c_emit(r_lw(r_s0, r_sp, -4));
-			c_emit(r_jalr(r_zero, r_ra, 0));
+			if (arch == a_arm) {
+				c_emit(a_add_i(ac_al, a_sp, a_s0, 16));
+				c_emit(a_lw(ac_al, a_lr, a_sp, -8));
+				c_emit(a_lw(ac_al, a_s0, a_sp, -4));
+				c_emit(a_mov_r(ac_al, a_pc, a_lr));
+			} else {
+				c_emit(r_addi(r_sp, r_s0, 16));
+				c_emit(r_lw(r_ra, r_sp, -8));
+				c_emit(r_lw(r_s0, r_sp, -4));
+				c_emit(r_jalr(r_zero, r_ra, 0));
+			}
 
 			fn = NULL;
 			printf("  exit %s", ii->string_param1);
@@ -528,7 +574,11 @@ void c_generate()
 
 			if (bd->next_local > 0) {
 				/* reserve stack space for locals */
-				c_emit(r_addi(r_sp, r_sp, -bd->locals_size));
+				if (arch == a_arm) {
+					c_emit(a_add_i(ac_al, a_sp, a_sp, -bd->locals_size));
+				} else {
+					c_emit(r_addi(r_sp, r_sp, -bd->locals_size));
+				}
 
 				stack_size += bd->locals_size;
 			}
@@ -540,7 +590,11 @@ void c_generate()
 
 			if (bd->next_local > 0) {
 				/* remove stack space for locals */
-				c_emit(r_addi(r_sp, r_sp, bd->locals_size));
+				if (arch == a_arm) {
+					c_emit(a_add_i(ac_al, a_sp, a_sp, bd->locals_size));
+				} else {
+					c_emit(r_addi(r_sp, r_sp, bd->locals_size));
+				}
 
 				stack_size -= bd->locals_size;
 			}
@@ -560,24 +614,41 @@ void c_generate()
 			e_add_symbol(ii->string_param1, strlen(ii->string_param1), code_start + pc);
 
 			/* create stack space for params and parent frame */
-			c_emit(r_addi(r_sp, r_sp, -16 - ps));
-			c_emit(r_sw(r_s0, r_sp, 12 + ps));
-			c_emit(r_sw(r_ra, r_sp, 8 + ps));
-			c_emit(r_addi(r_s0, r_sp, ps));
+			if (arch == a_arm) {
+				c_emit(a_add_i(ac_al, a_sp, a_sp, -16 - ps));
+				c_emit(a_sw(ac_al, a_s0, a_sp, 12 + ps));
+				c_emit(a_sw(ac_al, a_lr, a_sp, 8 + ps));
+				c_emit(a_add_i(ac_al, a_s0, a_sp, ps));
+			} else {
+				c_emit(r_addi(r_sp, r_sp, -16 - ps));
+				c_emit(r_sw(r_s0, r_sp, 12 + ps));
+				c_emit(r_sw(r_ra, r_sp, 8 + ps));
+				c_emit(r_addi(r_s0, r_sp, ps));
+			}
 
 			stack_size = ps;
 
 			/* push parameters on stack */
 			for (pn = 0; pn < fn->num_params; pn++) {
-				c_emit(r_sw(r_a0 + pn, r_s0, -fn->param_defs[pn].offset));
+				if (arch == a_arm) {
+					c_emit(a_sw(ac_al, a_r0 + pn, a_s0, -fn->param_defs[pn].offset));
+				} else {
+					c_emit(r_sw(r_a0 + pn, r_s0, -fn->param_defs[pn].offset));
+				}
 			}
 
 			printf("%s:", ii->string_param1);
 		}
 		if (op == op_exit) {
-			c_emit(r_addi(r_a0, r_zero, 0));
-			c_emit(r_addi(r_a7, r_zero, 93));
-			c_emit(r_ecall());
+			if (arch == a_arm) {
+				c_emit(a_mov_i(ac_al, a_r0, 0));
+				c_emit(a_mov_i(ac_al, a_r7, 93));
+				c_emit(a_swi());
+			} else {
+				c_emit(r_addi(r_a0, r_zero, 0));
+				c_emit(r_addi(r_a7, r_zero, 93));
+				c_emit(r_ecall());
+			}
 			printf("  exit");
 		}
 		printf("\n");
