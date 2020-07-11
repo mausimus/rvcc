@@ -290,8 +290,13 @@ void c_generate(arch_t arch)
 					abort(); /* not found? */
 				}
 				offset = -var->offset;
-				c_emit(r_addi(dest_reg, r_s0, 0));
-				c_emit(r_addi(dest_reg, dest_reg, offset));
+				if (arch == a_arm) {
+					c_emit(a_mov_r(ac_al, dest_reg, a_s0));
+					c_emit(a_add_i(ac_al, dest_reg, dest_reg, offset));
+				} else {
+					c_emit(r_addi(dest_reg, r_s0, 0));
+					c_emit(r_addi(dest_reg, dest_reg, offset));
+				}
 			}
 
 			printf("  x%d = &%s", dest_reg, ii->string_param1);
@@ -312,13 +317,19 @@ void c_generate(arch_t arch)
 		}
 		if (op == op_write_addr) {
 			/* write at memory address */
-			int dest_reg = ii->param_no + 10;
-			int addr_reg = ii->int_param1 + 10;
+			int dest_reg = c_dest_reg(ii->param_no, arch);
+			int addr_reg = c_dest_reg(ii->int_param1, arch);
 
 			if (ii->int_param2 == 4) {
-				c_emit(r_sw(dest_reg, addr_reg, 0));
+				if (arch == a_arm)
+					c_emit(a_sw(ac_al, dest_reg, addr_reg, 0));
+				else
+					c_emit(r_sw(dest_reg, addr_reg, 0));
 			} else if (ii->int_param2 == 1) {
-				c_emit(r_sb(dest_reg, addr_reg, 0));
+				if (arch == a_arm)
+					c_emit(a_sb(ac_al, dest_reg, addr_reg, 0));
+				else
+					c_emit(r_sb(dest_reg, addr_reg, 0));
 			} else {
 				abort();
 			}
@@ -642,7 +653,7 @@ void c_generate(arch_t arch)
 		if (op == op_exit) {
 			if (arch == a_arm) {
 				c_emit(a_mov_i(ac_al, a_r0, 0));
-				c_emit(a_mov_i(ac_al, a_r7, 93));
+				c_emit(a_mov_i(ac_al, a_r7, 1));
 				c_emit(a_swi());
 			} else {
 				c_emit(r_addi(r_a0, r_zero, 0));

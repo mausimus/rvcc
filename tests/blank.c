@@ -1,7 +1,9 @@
-int main()
+#include <stdio.h>
+int main(int argc, char *argv[])
 {
-	int x;
-	x = 666;
+printf("%d\n", argc);
+	int x = argc;
+/*	x = 666;*/
 /*	char *c;
 	c = "Hello";*/
 	return 0;

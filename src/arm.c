@@ -52,15 +52,17 @@ int a_mov(ar_cond cond, int io, int opcode, int s, int rn, int rd, int op2)
 
 int a_movw(ar_cond cond, a_reg rd, int imm)
 {
-	return a_encode(cond, 36, 0, rd, 0) + a_extract_bits(imm, 0, 7, 0, 7) + a_extract_bits(imm, 8, 10, 12, 14) +
-	       a_extract_bits(imm, 11, 11, 26, 26) + a_extract_bits(imm, 12, 15, 16, 19);
+	return a_encode(cond, 48, 0, rd, 0) + a_extract_bits(imm, 0, 11, 0, 11) + a_extract_bits(imm, 12, 15, 16, 19);
+	/*return a_encode(cond, 36, 0, rd, 0) + a_extract_bits(imm, 0, 7, 0, 7) + a_extract_bits(imm, 8, 10, 12, 14) +
+	       a_extract_bits(imm, 11, 11, 26, 26) + a_extract_bits(imm, 12, 15, 16, 19);*/
 }
 
 int a_movt(ar_cond cond, a_reg rd, int imm)
 {
 	imm = imm >> 16;
-	return a_encode(cond, 44, 0, rd, 0) + a_extract_bits(imm, 0, 7, 0, 7) + a_extract_bits(imm, 8, 10, 12, 14) +
-	       a_extract_bits(imm, 11, 11, 26, 26) + a_extract_bits(imm, 12, 15, 16, 19);
+	return a_encode(cond, 52, 0, rd, 0) + a_extract_bits(imm, 0, 11, 0, 11) + a_extract_bits(imm, 12, 15, 16, 19);
+	/*return a_encode(cond, 44, 0, rd, 0) + a_extract_bits(imm, 0, 7, 0, 7) + a_extract_bits(imm, 8, 10, 12, 14) +
+	       a_extract_bits(imm, 11, 11, 26, 26) + a_extract_bits(imm, 12, 15, 16, 19);*/
 }
 
 int a_mov_i(ar_cond cond, a_reg rd, int imm)
@@ -103,7 +105,7 @@ int a_nop()
 
 int a_transfer(ar_cond cond, int l, int size, a_reg rn, a_reg rd, int ofs)
 {
-	int opcode = 64 + 8 + l;
+	int opcode = 64 + 16 + 8 + l;
 	if (size == 1) {
 		opcode += 4;
 	}

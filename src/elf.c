@@ -115,7 +115,12 @@ void e_generate_header(arch_t arch)
 	e_write_header_int(0x34); /* program header offset */
 	e_write_header_int(_e_header_len + _e_code_idx + _e_data_idx + 39 + _e_symtab_idx +
 			   _e_strtab_idx); /* section header offset */
-	e_write_header_int(0);
+	/* flags */
+	if (arch == a_arm) {
+		e_write_header_int(0x5000200);
+	} else {
+		e_write_header_int(0);
+	}
 	e_write_header_byte(0x34); /* header size */
 	e_write_header_byte(0);
 	e_write_header_byte(0x20); /* program header size */

@@ -8,6 +8,8 @@ _start:
 	mov r7, #4
 	swi #0
 
+	movw r0, 5
+
 _exit:
 	mov r7, #1
 	swi #0
