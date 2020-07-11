@@ -27,6 +27,8 @@ void p_initialize()
 {
 	il_instr *ii;
 	type_def *type;
+	function_def *fn;
+	int i;
 
 	type = add_type();
 	strcpy(type->type_name, "void");
@@ -56,6 +58,30 @@ void p_initialize()
 	ii = add_instr(op_label);
 	ii->string_param1 = "_exit";
 	add_instr(op_exit);
+
+	fn = add_function("syscall");
+	fn->num_params = MAX_PARAMS;
+	for (i = 0; i < MAX_PARAMS; i++) {
+		strcpy(fn->param_defs[i].type_name, "int");
+		strcpy(fn->param_defs[i].variable_name, "var_arg");
+		fn->param_defs[i].is_pointer = 1;
+	}
+	ii = add_instr(op_entry_point);
+	fn->entry_point = ii->il_index;
+	ii->string_param1 = fn->return_def.variable_name;
+	add_generic(r_addi(r_a7, r_a0, 0));
+	add_generic(r_addi(r_a0, r_a1, 0));
+	add_generic(r_addi(r_a1, r_a2, 0));
+	add_generic(r_addi(r_a2, r_a3, 0));
+	add_generic(r_addi(r_a3, r_a4, 0));
+	add_generic(r_addi(r_a4, r_a5, 0));
+	add_generic(r_addi(r_a5, r_a6, 0));
+	add_generic(r_ecall());
+	ii = add_instr(op_return);
+	ii->string_param1 = fn->return_def.variable_name;
+	ii = add_instr(op_exit_point);
+	ii->string_param1 = fn->return_def.variable_name;
+	fn->exit_point = ii->il_index;
 }
 
 int p_read_numeric_constant(char buffer[])
@@ -1057,11 +1083,9 @@ void p_read_function_body(function_def *fdef)
 	p_read_code_block(fdef, NULL);
 
 	/* only add return when we have no return type, as otherwise there should have been a return statement */
-	/*if (strcmp(fdef->return_def.type_name, "void") == 0) {*/
 	ii = add_instr(op_exit_point);
 	ii->string_param1 = fdef->return_def.variable_name;
 	fdef->exit_point = ii->il_index;
-	/*}*/
 }
 
 /* if first token in is type */

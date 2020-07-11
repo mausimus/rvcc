@@ -6,20 +6,6 @@ typedef int FILE; /* TODO: struct */
 
 void abort();
 
-int syscall(int no, ...)
-{
-	/* no into a7, then all params from a0 */
-	_asm(0x00050893); /*             addi           a7, a0, 0*/
-	_asm(0x00058513); /*             addi           a0, a1, 0*/
-	_asm(0x00060593); /*             addi           a1, a2, 0*/
-	_asm(0x00068613); /*             addi           a2, a3, 0*/
-	_asm(0x00070693); /*             addi           a3, a4, 0*/
-	_asm(0x00078713); /*             addi           a4, a5, 0*/
-	_asm(0x00080793); /*             addi           a5, a6, 0*/
-	_asm(0x00000073); /*             ecall*/
-	return;
-}
-
 int strlen(char *str)
 {
 	int i = 0;
