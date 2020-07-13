@@ -63,7 +63,7 @@ void p_initialize(arch_t arch)
 	fn->entry_point = ii->il_index;
 	ii->string_param1 = fn->return_def.variable_name;
 	ii = add_instr(op_syscall);
-	ii = add_instr(op_return);
+	/*ii = add_instr(op_return);*/
 	ii->string_param1 = fn->return_def.variable_name;
 	ii = add_instr(op_exit_point);
 	ii->string_param1 = fn->return_def.variable_name;

@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 
 	if (infile == NULL) {
 		printf("Missing source file!\n");
-		printf("Usage: rvcc [-o outfile] [-noclib] [-Llibpath] [-march=riscv|arm] <infile.c>>\n");
+		printf("Usage: rvcc [-o outfile] [-noclib] [-Llibpath] [-march=riscv|arm] <infile.c>\n");
 		return -1;
 	}
 

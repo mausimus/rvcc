@@ -126,15 +126,13 @@ l_token l_next_token()
 				i++;
 			} while (l_read_char(0) != '\n');
 			_l_token_string[i] = 0;
-			l_skip_whitespace();
-			/* check if we have this alias */
+			/* check if we have this alias/define */
 			for (i = 0; i < _aliases_idx; i++) {
 				if (strcmp(_l_token_string, _aliases[i].alias) == 0) {
 					l_skip_whitespace();
 					return l_next_token();
 				}
 			}
-			/*if (strcmp(_l_token_string, _arch_define) != 0) {*/
 			/* skip lines until #endif */
 			do {
 				l_skip_whitespace();
@@ -146,7 +144,6 @@ l_token l_next_token()
 				_l_token_string[i] = 0;
 			} while (strcmp(_l_token_string, "#endif") != 0);
 			l_skip_whitespace();
-			/*}*/
 			return l_next_token();
 		}
 		if (strcmp(_l_token_string, "#endif") == 0) {
