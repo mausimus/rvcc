@@ -45,11 +45,13 @@ void p_initialize(arch_t arch)
 	e_add_symbol("", 0, 0); /* undef symbol */
 
 	if (arch == a_arm)
-		add_alias("__ARM", "");
+		add_alias("__ARM", "1");
 	else
-		add_alias("__RISCV", "");
+		add_alias("__RISCV", "1");
 
-	/* binary entry point: read params, call main,  exit */
+	/* binary entry point: read params, call main, exit */
+	ii = add_instr(op_label);
+	ii->string_param1 = "__start";
 	add_instr(op_start);
 	ii = add_instr(op_function_call);
 	ii->string_param1 = "main";
@@ -63,7 +65,6 @@ void p_initialize(arch_t arch)
 	fn->entry_point = ii->il_index;
 	ii->string_param1 = fn->return_def.variable_name;
 	ii = add_instr(op_syscall);
-	/*ii = add_instr(op_return);*/
 	ii->string_param1 = fn->return_def.variable_name;
 	ii = add_instr(op_exit_point);
 	ii->string_param1 = fn->return_def.variable_name;

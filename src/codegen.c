@@ -300,9 +300,9 @@ void c_generate(arch_t arch)
 			} else {
 				/* need to find the variable offset on stack, i.e. from s0 */
 				var = find_local_variable(ii->string_param1, bd);
-				if (var == NULL) {
+				if (var == NULL)
 					abort(); /* not found? */
-				}
+
 				offset = -var->offset;
 				if (arch == a_arm) {
 					c_emit(a_mov_r(ac_al, dest_reg, a_s0));
@@ -327,9 +327,9 @@ void c_generate(arch_t arch)
 					c_emit(a_lb(ac_al, dest_reg, op_reg, 0));
 				else
 					c_emit(r_lb(dest_reg, op_reg, 0));
-			} else {
+			} else
 				abort();
-			}
+
 			printf("  x%d = *x%d (%d)", dest_reg, op_reg, ii->int_param2);
 		}
 		if (op == op_write_addr) {
@@ -344,9 +344,9 @@ void c_generate(arch_t arch)
 					c_emit(a_sb(ac_al, dest_reg, op_reg, 0));
 				else
 					c_emit(r_sb(dest_reg, op_reg, 0));
-			} else {
+			} else
 				abort();
-			}
+
 			printf("  *x%d = x%d (%d)", op_reg, dest_reg, ii->int_param2);
 		}
 		if (op == op_jump) {
@@ -371,11 +371,10 @@ void c_generate(arch_t arch)
 			int jump_location = jump_instr->code_offset;
 			int ofs = jump_location - pc;
 
-			if (arch == a_arm) {
+			if (arch == a_arm)
 				c_emit(a_b(ac_al, ofs));
-			} else {
+			else
 				c_emit(r_jal(r_zero, ofs));
-			}
 
 			printf("  return %s", ii->string_param1);
 		}
@@ -396,14 +395,12 @@ void c_generate(arch_t arch)
 
 			if (arch == a_arm) {
 				c_emit(a_bl(ac_al, ofs));
-				if (dest_reg != a_r0) {
+				if (dest_reg != a_r0)
 					c_emit(a_mov_r(ac_al, dest_reg, a_r0));
-				}
 			} else {
 				c_emit(r_jal(r_ra, ofs));
-				if (dest_reg != r_a0) {
+				if (dest_reg != r_a0)
 					c_emit(r_addi(dest_reg, r_a0, 0));
-				}
 			}
 
 			printf("  x%d := %s() @ %d", dest_reg, ii->string_param1, fn->entry_point);
@@ -595,11 +592,10 @@ void c_generate(arch_t arch)
 
 			if (bd->next_local > 0) {
 				/* reserve stack space for locals */
-				if (arch == a_arm) {
+				if (arch == a_arm)
 					c_emit(a_add_i(ac_al, a_sp, a_sp, -bd->locals_size));
-				} else {
+				else
 					c_emit(r_addi(r_sp, r_sp, -bd->locals_size));
-				}
 
 				stack_size += bd->locals_size;
 			}
@@ -611,11 +607,10 @@ void c_generate(arch_t arch)
 
 			if (bd->next_local > 0) {
 				/* remove stack space for locals */
-				if (arch == a_arm) {
+				if (arch == a_arm)
 					c_emit(a_add_i(ac_al, a_sp, a_sp, bd->locals_size));
-				} else {
+				else
 					c_emit(r_addi(r_sp, r_sp, bd->locals_size));
-				}
 
 				stack_size -= bd->locals_size;
 			}
@@ -651,11 +646,10 @@ void c_generate(arch_t arch)
 
 			/* push parameters on stack */
 			for (pn = 0; pn < fn->num_params; pn++) {
-				if (arch == a_arm) {
+				if (arch == a_arm)
 					c_emit(a_sw(ac_al, a_r0 + pn, a_s0, -fn->param_defs[pn].offset));
-				} else {
+				else
 					c_emit(r_sw(r_a0 + pn, r_s0, -fn->param_defs[pn].offset));
-				}
 			}
 
 			printf("%s:", ii->string_param1);
