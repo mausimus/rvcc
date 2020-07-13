@@ -44,16 +44,13 @@ void p_initialize(arch_t arch)
 	add_block(NULL, NULL); /* global block */
 	e_add_symbol("", 0, 0); /* undef symbol */
 
-	/* main() parameters */
-	if (arch == a_arm) {
-		add_generic(a_lw(ac_al, a_r0, a_sp, 0)); /* argc */
-		add_generic(a_add_i(ac_al, a_r1, a_sp, 4)); /* argv */
-	} else {
-		add_generic(r_lw(r_a0, r_sp, 0)); /* argc */
-		add_generic(r_addi(r_a1, r_sp, 4)); /* argv */
-	}
+	if (arch == a_arm)
+		add_alias("__ARM", "");
+	else
+		add_alias("__RISCV", "");
 
-	/* binary entry point: call main, then exit */
+	/* binary entry point: read params, call main,  exit */
+	add_instr(op_start);
 	ii = add_instr(op_function_call);
 	ii->string_param1 = "main";
 	ii = add_instr(op_label);
@@ -1217,7 +1214,7 @@ void p_read_global_statement()
 void p_parse(arch_t arch)
 {
 	p_initialize(arch);
-	l_initialize(arch);
+	l_initialize();
 	do {
 		p_read_global_statement();
 	} while (!l_accept(t_eof));

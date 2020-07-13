@@ -2,7 +2,7 @@
 
 #define NULL 0
 
-#ifdef RISCV
+#ifdef __RISCV
 #define __syscall_exit 93
 #define __syscall_read 63
 #define __syscall_write 64
@@ -11,7 +11,7 @@
 #define __syscall_brk 214
 #endif
 
-#ifdef ARM
+#ifdef __ARM
 #define __syscall_exit 1
 #define __syscall_read 3
 #define __syscall_write 4
@@ -20,7 +20,7 @@
 #define __syscall_brk 45
 #endif
 
-typedef int FILE; /* TODO: struct */
+typedef int FILE;
 
 void abort();
 

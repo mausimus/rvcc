@@ -186,6 +186,9 @@ int c_get_code_length(il_instr *ii, arch_t arch)
 	if (op == op_bit_lshift || op == op_bit_rshift) {
 		return 4;
 	}
+	if (op == op_start) {
+		return 8;
+	}
 	if (op == op_syscall) {
 		return 20;
 	}
@@ -656,6 +659,16 @@ void c_generate(arch_t arch)
 			}
 
 			printf("%s:", ii->string_param1);
+		}
+		if (op == op_start) {
+			if (arch == a_arm) {
+				c_emit(a_lw(ac_al, a_r0, a_sp, 0)); /* argc */
+				c_emit(a_add_i(ac_al, a_r1, a_sp, 4)); /* argv */
+			} else {
+				c_emit(r_lw(r_a0, r_sp, 0)); /* argc */
+				c_emit(r_addi(r_a1, r_sp, 4)); /* argv */
+			}
+			printf("  start");
 		}
 		if (op == op_syscall) {
 			if (arch == a_arm) {

@@ -61,7 +61,6 @@ typedef enum {
 
 char _l_token_string[MAX_TOKEN_LEN];
 l_token _l_next_token;
-char _arch_define[MAX_ID_LEN];
 
 void l_skip_whitespace()
 {
@@ -128,20 +127,26 @@ l_token l_next_token()
 			} while (l_read_char(0) != '\n');
 			_l_token_string[i] = 0;
 			l_skip_whitespace();
-			/* check if we have this define */
-			if (strcmp(_l_token_string, _arch_define) != 0) {
-				/* skip lines until #endif */
-				do {
+			/* check if we have this alias */
+			for (i = 0; i < _aliases_idx; i++) {
+				if (strcmp(_l_token_string, _aliases[i].alias) == 0) {
 					l_skip_whitespace();
-					i = 0;
-					do {
-						_l_token_string[i] = _l_next_char;
-						i++;
-					} while (l_read_char(0) != '\n');
-					_l_token_string[i] = 0;
-				} while (strcmp(_l_token_string, "#endif") != 0);
-				l_skip_whitespace();
+					return l_next_token();
+				}
 			}
+			/*if (strcmp(_l_token_string, _arch_define) != 0) {*/
+			/* skip lines until #endif */
+			do {
+				l_skip_whitespace();
+				i = 0;
+				do {
+					_l_token_string[i] = _l_next_char;
+					i++;
+				} while (l_read_char(0) != '\n');
+				_l_token_string[i] = 0;
+			} while (strcmp(_l_token_string, "#endif") != 0);
+			l_skip_whitespace();
+			/*}*/
 			return l_next_token();
 		}
 		if (strcmp(_l_token_string, "#endif") == 0) {
@@ -495,16 +500,9 @@ void l_expect(l_token token)
 	_l_next_token = l_next_token();
 }
 
-void l_initialize(arch_t arch)
+void l_initialize()
 {
 	_source_idx = 0;
 	_l_next_char = _source[0];
-	if (arch == a_arm) {
-		strcpy(_arch_define, "ARM");
-	} else if (arch == a_riscv) {
-		strcpy(_arch_define, "RISCV");
-	} else {
-		strcpy(_arch_define, "GENERIC");
-	}
 	l_expect(t_sof);
 }
