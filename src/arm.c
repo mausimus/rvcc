@@ -222,3 +222,13 @@ int a_rsb_i(ar_cond cond, a_reg rd, int imm, a_reg rn)
 {
 	return a_mov(cond, 1, ar_rsb, 0, rd, rn, imm);
 }
+
+int a_cmp_r(ar_cond cond, a_reg rd, a_reg r1, a_reg r2)
+{
+	return a_mov(cond, 0, ar_cmp, 1, r1, rd, r2);
+}
+
+int a_teq(a_reg rd)
+{
+	return a_mov(ac_al, 1, ar_teq, 1, rd, 0, 0);
+}

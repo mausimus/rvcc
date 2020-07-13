@@ -130,13 +130,17 @@ int c_get_code_length(il_instr *ii, arch_t arch)
 		return 4;
 	}
 	if (op == op_load_numeric_constant) {
-		if (arch == a_arm)
-			return 8;
-
-		if (ii->int_param1 > -2048 && ii->int_param1 < 2047) {
-			return 4;
+		if (arch == a_arm) {
+			if (ii->int_param1 >= 0 && ii->int_param1 < 256)
+				return 4;
+			else
+				return 8;
 		}
-		return 8;
+
+		if (ii->int_param1 > -2048 && ii->int_param1 < 2047)
+			return 4;
+		else
+			return 8;
 	}
 	if (op == op_add) {
 		return 4;
@@ -155,7 +159,10 @@ int c_get_code_length(il_instr *ii, arch_t arch)
 	}
 	if (op == op_equals || op == op_not_equals || op == op_less_than || op == op_less_eq_than ||
 	    op == op_greater_than || op == op_greater_eq_than) {
-		return 16;
+		if (arch == a_arm)
+			return 12;
+		else
+			return 16;
 	}
 	if (op == op_push || op == op_pop) {
 		return 8;
@@ -245,6 +252,7 @@ void c_generate(arch_t arch)
 			int ofs = data_start + ii->int_param1 - pc;
 
 			if (arch == a_arm) {
+				ofs -= 8; /* prefetch */
 				if (ofs >= 0) {
 					c_emit(a_add_i(ac_al, dest_reg, a_pc, a_hi(ofs)));
 					c_emit(a_add_i(ac_al, dest_reg, dest_reg, a_lo(ofs)));
@@ -264,8 +272,12 @@ void c_generate(arch_t arch)
 			/* load numeric constant */
 			int val = ii->int_param1;
 			if (arch == a_arm) {
-				c_emit(a_movw(ac_al, dest_reg, val));
-				c_emit(a_movt(ac_al, dest_reg, val));
+				if (val >= 0 && val < 256) {
+					c_emit(a_mov_i(ac_al, dest_reg, val));
+				} else {
+					c_emit(a_movw(ac_al, dest_reg, val));
+					c_emit(a_movt(ac_al, dest_reg, val));
+				}
 			} else {
 				if (val > -2048 && val < 2047) {
 					c_emit(r_addi(dest_reg, r_zero, r_lo(val)));
@@ -488,22 +500,44 @@ void c_generate(arch_t arch)
 		if (op == op_equals || op == op_not_equals || op == op_less_than || op == op_less_eq_than ||
 		    op == op_greater_than || op == op_greater_eq_than) {
 			/* we want 1/nonzero if equ, 0 otherwise */
-			if (op == op_equals)
-				c_emit(r_beq(dest_reg, op_reg, 12));
-			else if (op == op_not_equals)
-				c_emit(r_bne(dest_reg, op_reg, 12));
-			else if (op == op_less_than)
-				c_emit(r_blt(dest_reg, op_reg, 12));
-			else if (op == op_greater_eq_than)
-				c_emit(r_bge(dest_reg, op_reg, 12));
-			else if (op == op_greater_than)
-				c_emit(r_blt(op_reg, dest_reg, 12));
-			else if (op == op_less_eq_than)
-				c_emit(r_bge(op_reg, dest_reg, 12));
+			if (arch == a_arm) {
+				ar_cond cond;
 
-			c_emit(r_addi(dest_reg, r_zero, 0));
-			c_emit(r_jal(r_zero, 8));
-			c_emit(r_addi(dest_reg, r_zero, 1));
+				c_emit(a_cmp_r(ac_al, dest_reg, dest_reg, op_reg));
+				c_emit(a_zero(dest_reg));
+
+				if (op == op_equals)
+					cond = ac_eq;
+				else if (op == op_not_equals)
+					cond = ac_ne;
+				else if (op == op_less_than)
+					cond = ac_lt;
+				else if (op == op_greater_eq_than)
+					cond = ac_ge;
+				else if (op == op_greater_than)
+					cond = ac_gt;
+				else if (op == op_less_eq_than)
+					cond = ac_le;
+
+				c_emit(a_mov_i(cond, dest_reg, 1));
+			} else {
+				if (op == op_equals)
+					c_emit(r_beq(dest_reg, op_reg, 12));
+				else if (op == op_not_equals)
+					c_emit(r_bne(dest_reg, op_reg, 12));
+				else if (op == op_less_than)
+					c_emit(r_blt(dest_reg, op_reg, 12));
+				else if (op == op_greater_eq_than)
+					c_emit(r_bge(dest_reg, op_reg, 12));
+				else if (op == op_greater_than)
+					c_emit(r_blt(op_reg, dest_reg, 12));
+				else if (op == op_less_eq_than)
+					c_emit(r_bge(op_reg, dest_reg, 12));
+
+				c_emit(r_addi(dest_reg, r_zero, 0));
+				c_emit(r_jal(r_zero, 8));
+				c_emit(r_addi(dest_reg, r_zero, 1));
+			}
 
 			if (op == op_equals)
 				printf("  x%d == x%d ?", dest_reg, op_reg);
@@ -559,27 +593,38 @@ void c_generate(arch_t arch)
 			int jump_location = jump_instr->code_offset;
 			int ofs = jump_location - pc - 4;
 
-			if (ofs >= -4096 && ofs <= 4095) {
-				/* near jump (branch) */
+			if (arch == a_arm) {
+				c_emit(a_teq(a_r0));
 				if (op == op_jz) {
-					c_emit(r_nop());
-					c_emit(r_beq(r_a0, r_zero, ofs));
+					c_emit(a_b(ac_eq, ofs));
 					printf("  if 0 -> %d", ii->int_param1);
 				} else {
-					c_emit(r_nop());
-					c_emit(r_bne(r_a0, r_zero, ofs));
+					c_emit(a_b(ac_ne, ofs));
 					printf("  if 1 -> %d", ii->int_param1);
 				}
 			} else {
-				/* far jump */
-				if (op == op_jz) {
-					c_emit(r_bne(r_a0, r_zero, 8)); /* skip next instruction */
-					c_emit(r_jal(r_zero, ofs));
-					printf("  if 0 --> %d", ii->int_param1);
+				if (ofs >= -4096 && ofs <= 4095) {
+					/* near jump (branch) */
+					if (op == op_jz) {
+						c_emit(r_nop());
+						c_emit(r_beq(r_a0, r_zero, ofs));
+						printf("  if 0 -> %d", ii->int_param1);
+					} else {
+						c_emit(r_nop());
+						c_emit(r_bne(r_a0, r_zero, ofs));
+						printf("  if 1 -> %d", ii->int_param1);
+					}
 				} else {
-					c_emit(r_beq(r_a0, r_zero, 8));
-					c_emit(r_jal(r_zero, ofs));
-					printf("  if 1 --> %d", ii->int_param1);
+					/* far jump */
+					if (op == op_jz) {
+						c_emit(r_bne(r_a0, r_zero, 8)); /* skip next instruction */
+						c_emit(r_jal(r_zero, ofs));
+						printf("  if 0 --> %d", ii->int_param1);
+					} else {
+						c_emit(r_beq(r_a0, r_zero, 8));
+						c_emit(r_jal(r_zero, ofs));
+						printf("  if 1 --> %d", ii->int_param1);
+					}
 				}
 			}
 		}
