@@ -91,7 +91,8 @@ typedef enum {
 	op_greater_eq_than,
 	op_bit_or,
 	op_bit_and,
-	op_negate
+	op_negate,
+	op_syscall
 } il_op;
 
 /* IL instruction */

@@ -57,49 +57,15 @@ void p_initialize(arch_t arch)
 	ii = add_instr(op_function_call);
 	ii->string_param1 = "main";
 	ii = add_instr(op_label);
-	ii->string_param1 = "_exit";
+	ii->string_param1 = "__exit";
 	add_instr(op_exit);
 
-	if (arch == a_arm) {
-		add_constant("_syscall_exit", 1);
-		add_constant("_syscall_read", 3);
-		add_constant("_syscall_write", 4);
-		add_constant("_syscall_close", 6);
-		add_constant("_syscall_open", 5);
-		add_constant("_syscall_brk", 45);
-	} else {
-		add_constant("_syscall_exit", 93);
-		add_constant("_syscall_read", 63);
-		add_constant("_syscall_write", 64);
-		add_constant("_syscall_close", 57);
-		add_constant("_syscall_open", 1024);
-		add_constant("_syscall_brk", 214);
-	}
-
-	fn = add_function("_syscall");
+	fn = add_function("__syscall");
 	fn->num_params = 0;
 	ii = add_instr(op_entry_point);
 	fn->entry_point = ii->il_index;
 	ii->string_param1 = fn->return_def.variable_name;
-	if (arch == a_arm) {
-		add_generic(a_mov_r(ac_al, a_r7, a_r0));
-		add_generic(a_mov_r(ac_al, a_r0, a_r1));
-		add_generic(a_mov_r(ac_al, a_r1, a_r2));
-		add_generic(a_mov_r(ac_al, a_r2, a_r3));
-		add_generic(a_mov_r(ac_al, a_r3, a_r4));
-		add_generic(a_mov_r(ac_al, a_r4, a_r5));
-		add_generic(a_mov_r(ac_al, a_r5, a_r6));
-		add_generic(a_swi());
-	} else {
-		add_generic(r_addi(r_a7, r_a0, 0));
-		add_generic(r_addi(r_a0, r_a1, 0));
-		add_generic(r_addi(r_a1, r_a2, 0));
-		add_generic(r_addi(r_a2, r_a3, 0));
-		add_generic(r_addi(r_a3, r_a4, 0));
-		add_generic(r_addi(r_a4, r_a5, 0));
-		add_generic(r_addi(r_a5, r_a6, 0));
-		add_generic(r_ecall());
-	}
+	ii = add_instr(op_syscall);
 	ii = add_instr(op_return);
 	ii->string_param1 = fn->return_def.variable_name;
 	ii = add_instr(op_exit_point);
@@ -1251,7 +1217,7 @@ void p_read_global_statement()
 void p_parse(arch_t arch)
 {
 	p_initialize(arch);
-	l_initialize();
+	l_initialize(arch);
 	do {
 		p_read_global_statement();
 	} while (!l_accept(t_eof));

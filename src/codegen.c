@@ -186,6 +186,9 @@ int c_get_code_length(il_instr *ii, arch_t arch)
 	if (op == op_bit_lshift || op == op_bit_rshift) {
 		return 4;
 	}
+	if (op == op_syscall) {
+		return 20;
+	}
 	error("Unsupported IL op");
 	return 0;
 }
@@ -653,6 +656,22 @@ void c_generate(arch_t arch)
 			}
 
 			printf("%s:", ii->string_param1);
+		}
+		if (op == op_syscall) {
+			if (arch == a_arm) {
+				c_emit(a_mov_r(ac_al, a_r7, a_r0));
+				c_emit(a_mov_r(ac_al, a_r0, a_r1));
+				c_emit(a_mov_r(ac_al, a_r1, a_r2));
+				c_emit(a_mov_r(ac_al, a_r2, a_r3));
+				c_emit(a_swi());
+			} else {
+				c_emit(r_addi(r_a7, r_a0, 0));
+				c_emit(r_addi(r_a0, r_a1, 0));
+				c_emit(r_addi(r_a1, r_a2, 0));
+				c_emit(r_addi(r_a2, r_a3, 0));
+				c_emit(r_ecall());
+			}
+			printf("  syscall");
 		}
 		if (op == op_exit) {
 			if (arch == a_arm) {
