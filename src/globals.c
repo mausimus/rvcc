@@ -22,9 +22,6 @@ char *_source;
 int _source_idx;
 char _l_next_char;
 
-char _l_token_string[MAX_TOKEN_LEN];
-l_token _l_next_token;
-
 int _c_block_level;
 
 variable_def *_temp_variable;

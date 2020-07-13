@@ -288,7 +288,7 @@ void printf(char *str, ...)
 		}
 	}
 	buffer[bi] = 0;
-	syscall(64, 0, buffer, bi);
+	_syscall(_syscall_write, 0, buffer, bi);
 }
 
 char *memcpy(char *dest, char *src, int count)
@@ -303,7 +303,7 @@ char *memcpy(char *dest, char *src, int count)
 
 void exit(int exit_code)
 {
-	syscall(93, exit_code);
+	_syscall(_syscall_exit, exit_code);
 }
 
 void abort()
@@ -318,23 +318,23 @@ void abort()
 FILE *fopen(char *filename, char *mode)
 {
 	if (strcmp(mode, "wb") == 0) {
-		return syscall(1024, filename, 65, 0x1c0);
+		return _syscall(_syscall_open, filename, 65, 0x1c0);
 	} else if (strcmp(mode, "rb") == 0) {
-		return syscall(1024, filename, 0, 0);
+		return _syscall(_syscall_open, filename, 0, 0);
 	}
 	abort();
 }
 
 int fclose(FILE *stream)
 {
-	syscall(57, stream);
+	_syscall(_syscall_close, stream);
 	return 0;
 }
 
 int fgetc(FILE *stream)
 {
 	char buf;
-	int r = syscall(63, stream, &buf, 1);
+	int r = _syscall(_syscall_read, stream, &buf, 1);
 	if (r <= 0) {
 		return -1;
 	}
@@ -368,7 +368,7 @@ int fputc(int c, FILE *stream)
 {
 	char buf[1];
 	buf[0] = c;
-	syscall(64, stream, &buf, 1);
+	_syscall(_syscall_write, stream, &buf, 1);
 	return 0;
 }
 
@@ -384,7 +384,7 @@ int fputs(char *str, FILE *stream)
 
 void *malloc(int size)
 {
-	int brk = syscall(214, 0); /* read current break */
-	syscall(214, brk + size); /* increment */
+	int brk = _syscall(_syscall_brk, 0); /* read current break */
+	_syscall(_syscall_brk, brk + size); /* increment */
 	return brk; /* return previous location, now extended by size */
 }

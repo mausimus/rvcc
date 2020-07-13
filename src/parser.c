@@ -1,8 +1,5 @@
 /* rvcc C compiler - source->IL parser */
 
-#include <stdio.h>
-#include <stdlib.h>
-
 void p_read_function_call(function_def *fn, int param_no, block_def *parent);
 void p_read_lvalue(lvalue_def *lvalue, variable_def *var, block_def *parent, int param_no, int evaluate);
 void p_read_expression(int param_no, block_def *parent);

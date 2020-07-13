@@ -1,5 +1,67 @@
 /* rvcc C compiler - lexer */
 
+/* lexer tokens */
+typedef enum {
+	t_sof,
+	t_numeric,
+	t_identifier,
+	t_comma,
+	t_string,
+	t_char,
+	t_op_bracket,
+	t_cl_bracket,
+	t_op_curly,
+	t_cl_curly,
+	t_op_square,
+	t_cl_square,
+	t_star,
+	t_bit_or,
+	t_log_and,
+	t_log_or,
+	t_log_not,
+	t_lt,
+	t_gt,
+	t_le,
+	t_ge,
+	t_lshift,
+	t_rshift,
+	t_dot,
+	t_arrow,
+	t_plus,
+	t_minus,
+	t_minuseq,
+	t_pluseq,
+	t_oreq,
+	t_andeq,
+	t_eq,
+	t_noteq,
+	t_assign,
+	t_plusplus,
+	t_minusminus,
+	t_semicolon,
+	t_eof,
+	t_ampersand,
+	t_return,
+	t_if,
+	t_else,
+	t_while,
+	t_for,
+	t_do,
+	t_op_comment,
+	t_cl_comment,
+	t_define,
+	t_include,
+	t_typedef,
+	t_enum,
+	t_struct,
+	t_sizeof,
+	t_elipsis,
+	t_asm
+} l_token;
+
+char _l_token_string[MAX_TOKEN_LEN];
+l_token _l_next_token;
+
 void l_skip_whitespace()
 {
 	while (is_whitespace(_l_next_char)) {
