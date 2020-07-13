@@ -63,7 +63,23 @@ void p_initialize(arch_t arch)
 	ii->string_param1 = "_exit";
 	add_instr(op_exit);
 
-	fn = add_function("syscall");
+	if (arch == a_arm) {
+		add_constant("_syscall_exit", 1);
+		add_constant("_syscall_read", 3);
+		add_constant("_syscall_write", 4);
+		add_constant("_syscall_close", 6);
+		add_constant("_syscall_open", 5);
+		add_constant("_syscall_brk", 45);
+	} else {
+		add_constant("_syscall_exit", 93);
+		add_constant("_syscall_read", 63);
+		add_constant("_syscall_write", 64);
+		add_constant("_syscall_close", 57);
+		add_constant("_syscall_open", 1024);
+		add_constant("_syscall_brk", 214);
+	}
+
+	fn = add_function("_syscall");
 	fn->num_params = 0;
 	ii = add_instr(op_entry_point);
 	fn->entry_point = ii->il_index;

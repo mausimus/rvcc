@@ -225,6 +225,8 @@ void c_generate(arch_t arch)
 		il_instr *ii = &_il[i];
 		il_op op = ii->op;
 		int pc = _e_code_idx;
+		int dest_reg = c_dest_reg(ii->param_no, arch);
+		int op_reg = c_dest_reg(ii->int_param1, arch);
 
 		/* format IL log prefix */
 		printf("%4d %3d  %#010x     ", i, op, code_start + pc);
@@ -235,7 +237,6 @@ void c_generate(arch_t arch)
 		if (op == op_load_data_address) {
 			/* lookup address of a constant in data section as offset from PC */
 			int ofs = data_start + ii->int_param1 - pc;
-			int dest_reg = c_dest_reg(ii->param_no, arch);
 
 			if (arch == a_arm) {
 				if (ofs >= 0) {
@@ -256,7 +257,6 @@ void c_generate(arch_t arch)
 		if (op == op_load_numeric_constant) {
 			/* load numeric constant */
 			int val = ii->int_param1;
-			int dest_reg = c_dest_reg(ii->param_no, arch);
 			if (arch == a_arm) {
 				c_emit(a_movw(ac_al, dest_reg, val));
 				c_emit(a_movt(ac_al, dest_reg, val));
@@ -272,17 +272,25 @@ void c_generate(arch_t arch)
 		}
 		if (op == op_get_var_addr) {
 			/* lookup address of a variable */
-			int dest_reg = c_dest_reg(ii->param_no, arch);
 			int offset;
 
 			var = find_global_variable(ii->string_param1);
 			if (var != NULL) {
-				/* need to find the variable offset in data section, from PC */
-				int ofs = (data_start - pc) + var->offset;
+				int ofs = data_start + var->offset;
+				if (arch == a_arm) {
+					/* need to find the variable offset in data section, absolute */
+					ofs += _e_code_start;
 
-				c_emit(r_auipc(dest_reg, r_hi(ofs)));
-				offset = r_lo(ofs);
-				c_emit(r_addi(dest_reg, dest_reg, offset));
+					c_emit(a_movw(ac_al, dest_reg, ofs));
+					c_emit(a_movt(ac_al, dest_reg, ofs));
+				} else {
+					/* need to find the variable offset in data section, from PC */
+					ofs -= pc;
+
+					c_emit(r_auipc(dest_reg, r_hi(ofs)));
+					offset = r_lo(ofs);
+					c_emit(r_addi(dest_reg, dest_reg, offset));
+				}
 			} else {
 				/* need to find the variable offset on stack, i.e. from s0 */
 				var = find_local_variable(ii->string_param1, bd);
@@ -303,37 +311,37 @@ void c_generate(arch_t arch)
 		}
 		if (op == op_read_addr) {
 			/* read (dereference) memory address */
-			int dest_reg = ii->param_no + 10;
-			int addr_reg = ii->int_param1 + 10;
-
 			if (ii->int_param2 == 4) {
-				c_emit(r_lw(dest_reg, addr_reg, 0));
+				if (arch == a_arm)
+					c_emit(a_lw(ac_al, dest_reg, op_reg, 0));
+				else
+					c_emit(r_lw(dest_reg, op_reg, 0));
 			} else if (ii->int_param2 == 1) {
-				c_emit(r_lb(dest_reg, addr_reg, 0));
+				if (arch == a_arm)
+					c_emit(a_lb(ac_al, dest_reg, op_reg, 0));
+				else
+					c_emit(r_lb(dest_reg, op_reg, 0));
 			} else {
 				abort();
 			}
-			printf("  x%d = *x%d (%d)", dest_reg, addr_reg, ii->int_param2);
+			printf("  x%d = *x%d (%d)", dest_reg, op_reg, ii->int_param2);
 		}
 		if (op == op_write_addr) {
 			/* write at memory address */
-			int dest_reg = c_dest_reg(ii->param_no, arch);
-			int addr_reg = c_dest_reg(ii->int_param1, arch);
-
 			if (ii->int_param2 == 4) {
 				if (arch == a_arm)
-					c_emit(a_sw(ac_al, dest_reg, addr_reg, 0));
+					c_emit(a_sw(ac_al, dest_reg, op_reg, 0));
 				else
-					c_emit(r_sw(dest_reg, addr_reg, 0));
+					c_emit(r_sw(dest_reg, op_reg, 0));
 			} else if (ii->int_param2 == 1) {
 				if (arch == a_arm)
-					c_emit(a_sb(ac_al, dest_reg, addr_reg, 0));
+					c_emit(a_sb(ac_al, dest_reg, op_reg, 0));
 				else
-					c_emit(r_sb(dest_reg, addr_reg, 0));
+					c_emit(r_sb(dest_reg, op_reg, 0));
 			} else {
 				abort();
 			}
-			printf("  *x%d = x%d (%d)", addr_reg, dest_reg, ii->int_param2);
+			printf("  *x%d = x%d (%d)", op_reg, dest_reg, ii->int_param2);
 		}
 		if (op == op_jump) {
 			/* unconditional jump to an IL-index */
@@ -342,7 +350,10 @@ void c_generate(arch_t arch)
 			int jump_location = jump_instr->code_offset;
 			int ofs = jump_location - pc;
 
-			c_emit(r_jal(r_zero, ofs));
+			if (arch == a_arm)
+				c_emit(a_b(ac_al, ofs));
+			else
+				c_emit(r_jal(r_zero, ofs));
 
 			printf("  -> %d", ii->int_param1);
 		}
@@ -364,7 +375,6 @@ void c_generate(arch_t arch)
 		}
 		if (op == op_function_call) {
 			/* function call */
-			int dest_reg = c_dest_reg(ii->param_no, arch);
 			int ofs;
 			int jump_instr_index;
 			il_instr *jump_instr;
@@ -393,18 +403,24 @@ void c_generate(arch_t arch)
 			printf("  x%d := %s() @ %d", dest_reg, ii->string_param1, fn->entry_point);
 		}
 		if (op == op_push) {
-			int dest_reg = ii->param_no + 10;
-
-			c_emit(r_addi(r_sp, r_sp, -16)); /* 16 aligned although we only need 4 */
-			c_emit(r_sw(dest_reg, r_sp, 0));
+			if (arch == a_arm) {
+				c_emit(a_add_i(ac_al, r_sp, r_sp, -16)); /* 16 aligned although we only need 4 */
+				c_emit(a_sw(ac_al, dest_reg, r_sp, 0));
+			} else {
+				c_emit(r_addi(r_sp, r_sp, -16)); /* 16 aligned although we only need 4 */
+				c_emit(r_sw(dest_reg, r_sp, 0));
+			}
 
 			printf("  push x%d", dest_reg);
 		}
 		if (op == op_pop) {
-			int dest_reg = ii->param_no + 10;
-
-			c_emit(r_lw(dest_reg, r_sp, 0));
-			c_emit(r_addi(r_sp, r_sp, 16)); /* 16 aligned although we only need 4 */
+			if (arch == a_arm) {
+				c_emit(a_lw(ac_al, dest_reg, r_sp, 0));
+				c_emit(a_add_i(ac_al, r_sp, r_sp, 16)); /* 16 aligned although we only need 4 */
+			} else {
+				c_emit(r_lw(dest_reg, r_sp, 0));
+				c_emit(r_addi(r_sp, r_sp, 16)); /* 16 aligned although we only need 4 */
+			}
 
 			printf("  pop x%d", dest_reg);
 		}
@@ -426,33 +442,34 @@ void c_generate(arch_t arch)
 			printf("  exit %s", ii->string_param1);
 		}
 		if (op == op_add) {
-			int dest_reg = ii->param_no + 10;
-			int op_reg = ii->int_param1 + 10;
-
-			c_emit(r_add(dest_reg, dest_reg, op_reg));
+			if (arch == a_arm)
+				c_emit(a_add_r(ac_al, dest_reg, dest_reg, op_reg));
+			else
+				c_emit(r_add(dest_reg, dest_reg, op_reg));
 
 			printf("  x%d += x%d", dest_reg, op_reg);
 		}
 		if (op == op_sub) {
-			int dest_reg = ii->param_no + 10;
-			int op_reg = ii->int_param1 + 10;
-
-			c_emit(r_sub(dest_reg, dest_reg, op_reg));
+			if (arch == a_arm)
+				c_emit(a_sub_r(ac_al, dest_reg, dest_reg, op_reg));
+			else
+				c_emit(r_sub(dest_reg, dest_reg, op_reg));
 
 			printf("  x%d -= x%d", dest_reg, op_reg);
 		}
 		if (op == op_mul) {
-			int dest_reg = ii->param_no + 10;
-			int op_reg = ii->int_param1 + 10;
-
-			c_emit(r_mul(dest_reg, dest_reg, op_reg));
+			if (arch == a_arm)
+				c_emit(a_mul(ac_al, dest_reg, dest_reg, op_reg));
+			else
+				c_emit(r_mul(dest_reg, dest_reg, op_reg));
 
 			printf("  x%d *= x%d", dest_reg, op_reg);
 		}
 		if (op == op_negate) {
-			int dest_reg = ii->param_no + 10;
-
-			c_emit(r_sub(dest_reg, r_zero, dest_reg));
+			if (arch == a_arm)
+				c_emit(a_rsb_i(ac_al, dest_reg, 0, dest_reg));
+			else
+				c_emit(r_sub(dest_reg, r_zero, dest_reg));
 
 			printf("  -x%d", dest_reg);
 		}
@@ -467,79 +484,66 @@ void c_generate(arch_t arch)
 		}
 		if (op == op_equals || op == op_not_equals || op == op_less_than || op == op_less_eq_than ||
 		    op == op_greater_than || op == op_greater_eq_than) {
-			int dest_reg = ii->param_no + 10;
-			int supp_reg = ii->int_param1 + 10;
-
 			/* we want 1/nonzero if equ, 0 otherwise */
 			if (op == op_equals)
-				c_emit(r_beq(dest_reg, supp_reg, 12));
+				c_emit(r_beq(dest_reg, op_reg, 12));
 			else if (op == op_not_equals)
-				c_emit(r_bne(dest_reg, supp_reg, 12));
+				c_emit(r_bne(dest_reg, op_reg, 12));
 			else if (op == op_less_than)
-				c_emit(r_blt(dest_reg, supp_reg, 12));
+				c_emit(r_blt(dest_reg, op_reg, 12));
 			else if (op == op_greater_eq_than)
-				c_emit(r_bge(dest_reg, supp_reg, 12));
+				c_emit(r_bge(dest_reg, op_reg, 12));
 			else if (op == op_greater_than)
-				c_emit(r_blt(supp_reg, dest_reg, 12));
+				c_emit(r_blt(op_reg, dest_reg, 12));
 			else if (op == op_less_eq_than)
-				c_emit(r_bge(supp_reg, dest_reg, 12));
+				c_emit(r_bge(op_reg, dest_reg, 12));
 
 			c_emit(r_addi(dest_reg, r_zero, 0));
 			c_emit(r_jal(r_zero, 8));
 			c_emit(r_addi(dest_reg, r_zero, 1));
 
 			if (op == op_equals)
-				printf("  x%d == x%d ?", dest_reg, supp_reg);
+				printf("  x%d == x%d ?", dest_reg, op_reg);
 			else if (op == op_not_equals)
-				printf("  x%d != x%d ?", dest_reg, supp_reg);
+				printf("  x%d != x%d ?", dest_reg, op_reg);
 			else if (op == op_less_than)
-				printf("  x%d < x%d ?", dest_reg, supp_reg);
+				printf("  x%d < x%d ?", dest_reg, op_reg);
 			else if (op == op_greater_eq_than)
-				printf("  x%d >= x%d ?", dest_reg, supp_reg);
+				printf("  x%d >= x%d ?", dest_reg, op_reg);
 			else if (op == op_greater_than)
-				printf("  x%d > x%d ?", dest_reg, supp_reg);
+				printf("  x%d > x%d ?", dest_reg, op_reg);
 			else if (op == op_less_eq_than)
-				printf("  x%d <= x%d ?", dest_reg, supp_reg);
+				printf("  x%d <= x%d ?", dest_reg, op_reg);
 		}
 		if (op == op_log_and || op == op_log_or) {
-			int dest_reg = ii->param_no + 10;
-			int supp_reg = ii->int_param1 + 10;
-
 			if (op == op_log_and) {
 				/* we assume both have to be 1, they can't be just nonzero */
-				c_emit(r_and(dest_reg, dest_reg, supp_reg));
-				printf("  x%d &&= x%d", dest_reg, supp_reg);
+				c_emit(r_and(dest_reg, dest_reg, op_reg));
+				printf("  x%d &&= x%d", dest_reg, op_reg);
 			} else if (op == op_log_or) {
-				c_emit(r_or(dest_reg, dest_reg, supp_reg));
-				printf("  x%d ||= x%d", dest_reg, supp_reg);
+				c_emit(r_or(dest_reg, dest_reg, op_reg));
+				printf("  x%d ||= x%d", dest_reg, op_reg);
 			}
 		}
 		if (op == op_bit_and || op == op_bit_or) {
-			int dest_reg = ii->param_no + 10;
-			int supp_reg = ii->int_param1 + 10;
-
 			if (op == op_bit_and) {
-				c_emit(r_and(dest_reg, dest_reg, supp_reg));
-				printf("  x%d &= x%d", dest_reg, supp_reg);
+				c_emit(r_and(dest_reg, dest_reg, op_reg));
+				printf("  x%d &= x%d", dest_reg, op_reg);
 			} else if (op == op_bit_or) {
-				c_emit(r_or(dest_reg, dest_reg, supp_reg));
-				printf("  x%d |= x%d", dest_reg, supp_reg);
+				c_emit(r_or(dest_reg, dest_reg, op_reg));
+				printf("  x%d |= x%d", dest_reg, op_reg);
 			}
 		}
 		if (op == op_bit_lshift || op == op_bit_rshift) {
-			int dest_reg = ii->param_no + 10;
-			int supp_reg = ii->int_param1 + 10;
-
 			if (op == op_bit_lshift) {
-				c_emit(r_sll(dest_reg, dest_reg, supp_reg));
-				printf("  x%d <<= x%d", dest_reg, supp_reg);
+				c_emit(r_sll(dest_reg, dest_reg, op_reg));
+				printf("  x%d <<= x%d", dest_reg, op_reg);
 			} else if (op == op_bit_rshift) {
-				c_emit(r_srl(dest_reg, dest_reg, supp_reg));
-				printf("  x%d >>= x%d", dest_reg, supp_reg);
+				c_emit(r_srl(dest_reg, dest_reg, op_reg));
+				printf("  x%d >>= x%d", dest_reg, op_reg);
 			}
 		}
 		if (op == op_not) {
-			int dest_reg = ii->param_no + 10;
 			/* 1 if zero, 0 if nonzero */
 			/* only works for small range integers */
 			c_emit(r_sltiu(dest_reg, dest_reg, 1));

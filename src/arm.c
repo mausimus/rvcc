@@ -53,16 +53,12 @@ int a_mov(ar_cond cond, int io, int opcode, int s, int rn, int rd, int op2)
 int a_movw(ar_cond cond, a_reg rd, int imm)
 {
 	return a_encode(cond, 48, 0, rd, 0) + a_extract_bits(imm, 0, 11, 0, 11) + a_extract_bits(imm, 12, 15, 16, 19);
-	/*return a_encode(cond, 36, 0, rd, 0) + a_extract_bits(imm, 0, 7, 0, 7) + a_extract_bits(imm, 8, 10, 12, 14) +
-	       a_extract_bits(imm, 11, 11, 26, 26) + a_extract_bits(imm, 12, 15, 16, 19);*/
 }
 
 int a_movt(ar_cond cond, a_reg rd, int imm)
 {
 	imm = imm >> 16;
 	return a_encode(cond, 52, 0, rd, 0) + a_extract_bits(imm, 0, 11, 0, 11) + a_extract_bits(imm, 12, 15, 16, 19);
-	/*return a_encode(cond, 44, 0, rd, 0) + a_extract_bits(imm, 0, 7, 0, 7) + a_extract_bits(imm, 8, 10, 12, 14) +
-	       a_extract_bits(imm, 11, 11, 26, 26) + a_extract_bits(imm, 12, 15, 16, 19);*/
 }
 
 int a_mov_i(ar_cond cond, a_reg rd, int imm)
@@ -91,6 +87,11 @@ int a_sub_i(ar_cond cond, a_reg rd, a_reg rs, int imm)
 int a_add_r(ar_cond cond, a_reg rd, a_reg rs, a_reg ro)
 {
 	return a_mov(cond, 0, ar_add, 0, rs, rd, ro);
+}
+
+int a_sub_r(ar_cond cond, a_reg rd, a_reg rs, a_reg ro)
+{
+	return a_mov(cond, 0, ar_sub, 0, rs, rd, ro);
 }
 
 int a_zero(int rd)
@@ -151,4 +152,14 @@ int a_bl(ar_cond cond, int ofs)
 {
 	int o = (ofs - 8) >> 2;
 	return a_encode(cond, 176, 0, 0, 0) + (o & 16777215);
+}
+
+int a_mul(ar_cond cond, a_reg rd, a_reg r1, a_reg r2)
+{
+	return a_encode(cond, 0, rd, 0, (r1 << 8) + 144 + r2);
+}
+
+int a_rsb_i(ar_cond cond, a_reg rd, int imm, a_reg rn)
+{
+	return a_mov(cond, 1, ar_rsb, 0, rd, rn, imm);
 }
