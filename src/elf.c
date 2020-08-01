@@ -262,6 +262,16 @@ void e_align()
 	if (remainder != 0) {
 		_e_data_idx += (4 - remainder);
 	}
+
+	remainder = _e_symtab_idx & 3;
+	if (remainder != 0) {
+		_e_symtab_idx += (4 - remainder);
+	}
+
+	remainder = _e_strtab_idx & 3;
+	if (remainder != 0) {
+		_e_strtab_idx += (4 - remainder);
+	}
 }
 
 void e_add_symbol(char *symbol, int len, int pc)

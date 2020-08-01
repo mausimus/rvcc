@@ -229,6 +229,8 @@ void c_generate(arch_t arch)
 	data_start = c_calculate_code_length(arch);
 	c_size_functions(code_start + data_start);
 
+	printf("code_start = %#010x, data_start = %#010x\n", code_start, data_start);
+
 	for (i = 0; i < _il_idx; i++) {
 		int stack_size, j;
 		variable_def *var;
@@ -252,21 +254,25 @@ void c_generate(arch_t arch)
 			int ofs = data_start + ii->int_param1 - pc;
 
 			if (arch == a_arm) {
-				ofs -= 8; /* prefetch */
+				ofs = code_start + data_start + ii->int_param1;
+				c_emit(a_movw(ac_al, dest_reg, ofs));
+				c_emit(a_movt(ac_al, dest_reg, ofs));
+
+				/*ofs -= 8; prefetch
 				if (ofs >= 0) {
 					c_emit(a_add_i(ac_al, dest_reg, a_pc, a_hi(ofs)));
 					c_emit(a_add_i(ac_al, dest_reg, dest_reg, a_lo(ofs)));
 				} else {
 					ofs = -ofs;
 					c_emit(a_sub_i(ac_al, dest_reg, a_pc, a_hi(ofs)));
-					c_emit(a_sub_i(ac_al, dest_reg, dest_reg, a_lo(ofs)));
-				}
+				*/
+				/*c_emit(a_sub_i(ac_al, dest_reg, dest_reg, a_lo(ofs)));*/
 			} else {
 				c_emit(r_auipc(dest_reg, r_hi(ofs)));
 				c_emit(r_addi(dest_reg, dest_reg, r_lo(ofs)));
 			}
 
-			printf("  x%d := &data[%d]", dest_reg, ii->int_param1);
+			printf("  x%d := &data[%d] @ PC+%d", dest_reg, ii->int_param1, ofs);
 		}
 		if (op == op_load_numeric_constant) {
 			/* load numeric constant */
@@ -317,8 +323,8 @@ void c_generate(arch_t arch)
 
 				offset = -var->offset;
 				if (arch == a_arm) {
-					c_emit(a_mov_r(ac_al, dest_reg, a_s0));
-					c_emit(a_add_i(ac_al, dest_reg, dest_reg, offset));
+					c_emit(a_add_i(ac_al, dest_reg, a_s0, offset & 255));
+					c_emit(a_add_i(ac_al, dest_reg, dest_reg, offset - (offset & 255)));
 				} else {
 					c_emit(r_addi(dest_reg, r_s0, 0));
 					c_emit(r_addi(dest_reg, dest_reg, offset));
