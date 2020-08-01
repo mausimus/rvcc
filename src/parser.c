@@ -1,8 +1,5 @@
 /* rvcc C compiler - source->IL parser */
 
-#include <stdio.h>
-#include <stdlib.h>
-
 void p_read_function_call(function_def *fn, int param_no, block_def *parent);
 void p_read_lvalue(lvalue_def *lvalue, variable_def *var, block_def *parent, int param_no, int evaluate);
 void p_read_expression(int param_no, block_def *parent);
@@ -23,39 +20,55 @@ int p_get_size(variable_def *var, type_def *type)
 	return type->size;
 }
 
-void p_initialize()
+void p_initialize(arch_t arch)
 {
 	il_instr *ii;
 	type_def *type;
+	function_def *fn;
 
-	type = add_type();
-	strcpy(type->type_name, "void");
+	/* built-in types */
+	type = add_named_type("void");
 	type->base_type = bt_void;
 	type->size = 0;
 
-	type = add_type();
-	strcpy(type->type_name, "char");
+	type = add_named_type("char");
 	type->base_type = bt_char;
 	type->size = 1;
 
-	type = add_type();
-	strcpy(type->type_name, "int");
+	type = add_named_type("int");
 	type->base_type = bt_int;
 	type->size = 4;
 
 	add_block(NULL, NULL); /* global block */
 	e_add_symbol("", 0, 0); /* undef symbol */
 
-	/* main() parameters */
-	add_generic(r_lw(r_a0, r_sp, 0)); /* argc */
-	add_generic(r_addi(r_a1, r_sp, 4)); /* argv */
+	/* architecutre define */
+	if (arch == a_arm)
+		add_alias("__ARM", "1");
+	else
+		add_alias("__RISCV", "1");
 
-	/* binary entry point: call main, then exit */
+	/* binary entry point: read params, call main, exit */
+	ii = add_instr(op_label);
+	ii->string_param1 = "__start";
+	add_instr(op_start);
 	ii = add_instr(op_function_call);
 	ii->string_param1 = "main";
 	ii = add_instr(op_label);
-	ii->string_param1 = "_exit";
+	ii->string_param1 = "__exit";
 	add_instr(op_exit);
+
+	/* Linux syscall */
+	fn = add_function("__syscall");
+	fn->num_params = 0;
+	ii = add_instr(op_entry_point);
+	fn->entry_point = ii->il_index;
+	ii->string_param1 = fn->return_def.variable_name;
+	ii = add_instr(op_syscall);
+	ii->string_param1 = fn->return_def.variable_name;
+	ii = add_instr(op_exit_point);
+	ii->string_param1 = fn->return_def.variable_name;
+	fn->exit_point = ii->il_index;
 }
 
 int p_read_numeric_constant(char buffer[])
@@ -1057,11 +1070,9 @@ void p_read_function_body(function_def *fdef)
 	p_read_code_block(fdef, NULL);
 
 	/* only add return when we have no return type, as otherwise there should have been a return statement */
-	/*if (strcmp(fdef->return_def.type_name, "void") == 0) {*/
 	ii = add_instr(op_exit_point);
 	ii->string_param1 = fdef->return_def.variable_name;
 	fdef->exit_point = ii->il_index;
-	/*}*/
 }
 
 /* if first token in is type */
@@ -1201,9 +1212,9 @@ void p_read_global_statement()
 	}
 }
 
-void p_parse()
+void p_parse(arch_t arch)
 {
-	p_initialize();
+	p_initialize(arch);
 	l_initialize();
 	do {
 		p_read_global_statement();

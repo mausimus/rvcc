@@ -22,6 +22,7 @@ void fcopy_test()
 	FILE *in = fopen("in.txt", "rb");
 	FILE *out = fopen("out.txt", "wb");
 	copy(in, out);
+	printf("Closing files\n");
 	fclose(in);
 	fclose(out);
 }
@@ -41,7 +42,7 @@ void malloc_test()
 
 int main(int argc, char *argv[])
 {
-	printf("Num args: %\n", argc);
+	printf("Num args: %d\n", argc);
 	while (argc > 0) {
 		argc--;
 		printf("%s\n", argv[argc]);

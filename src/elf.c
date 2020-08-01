@@ -92,7 +92,7 @@ void e_write_data_byte(char val)
 	_e_data_idx++;
 }
 
-void e_generate_header()
+void e_generate_header(arch_t arch)
 {
 	/* ELF header */
 	e_write_header_int(0x464c457f); /* ELF magic */
@@ -104,14 +104,23 @@ void e_generate_header()
 	e_write_header_int(0);
 	e_write_header_byte(2); /* ET_EXEC */
 	e_write_header_byte(0);
-	e_write_header_byte(0xf3); /* RISC-V */
+	if (arch == a_arm) {
+		e_write_header_byte(0x28); /* ARM */
+	} else {
+		e_write_header_byte(0xf3); /* RISC-V */
+	}
 	e_write_header_byte(0);
 	e_write_header_int(1); /* ELF version */
 	e_write_header_int(ELF_START + _e_header_len); /* entry point */
 	e_write_header_int(0x34); /* program header offset */
 	e_write_header_int(_e_header_len + _e_code_idx + _e_data_idx + 39 + _e_symtab_idx +
 			   _e_strtab_idx); /* section header offset */
-	e_write_header_int(0);
+	/* flags */
+	if (arch == a_arm) {
+		e_write_header_int(0x5000200);
+	} else {
+		e_write_header_int(0);
+	}
 	e_write_header_byte(0x34); /* header size */
 	e_write_header_byte(0);
 	e_write_header_byte(0x20); /* program header size */
@@ -253,6 +262,16 @@ void e_align()
 	if (remainder != 0) {
 		_e_data_idx += (4 - remainder);
 	}
+
+	remainder = _e_symtab_idx & 3;
+	if (remainder != 0) {
+		_e_symtab_idx += (4 - remainder);
+	}
+
+	remainder = _e_strtab_idx & 3;
+	if (remainder != 0) {
+		_e_strtab_idx += (4 - remainder);
+	}
 }
 
 void e_add_symbol(char *symbol, int len, int pc)
@@ -297,10 +316,10 @@ void e_output(char *outfile)
 	fclose(fp);
 }
 
-void e_generate(char *outfile)
+void e_generate(char *outfile, arch_t arch)
 {
 	e_align();
-	e_generate_header();
+	e_generate_header(arch);
 	e_generate_footer();
 	e_output(outfile);
 }

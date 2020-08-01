@@ -1,6 +1,6 @@
 int main(int argc, char *argv[])
 {
+	printf("%d\n", argc);
 	printf("Hello World\n");
-printf("%d", 666);
 	return 0;
 }

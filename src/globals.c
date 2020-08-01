@@ -22,9 +22,6 @@ char *_source;
 int _source_idx;
 char _l_next_char;
 
-char _l_token_string[MAX_TOKEN_LEN];
-l_token _l_next_token;
-
 int _c_block_level;
 
 variable_def *_temp_variable;
@@ -131,6 +128,13 @@ type_def *add_type()
 {
 	type_def *type = &_types[_types_idx];
 	_types_idx++;
+	return type;
+}
+
+type_def *add_named_type(char *name)
+{
+	type_def *type = add_type();
+	strcpy(type->type_name, name);
 	return type;
 }
 

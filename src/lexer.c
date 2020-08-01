@@ -1,5 +1,67 @@
 /* rvcc C compiler - lexer */
 
+/* lexer tokens */
+typedef enum {
+	t_sof,
+	t_numeric,
+	t_identifier,
+	t_comma,
+	t_string,
+	t_char,
+	t_op_bracket,
+	t_cl_bracket,
+	t_op_curly,
+	t_cl_curly,
+	t_op_square,
+	t_cl_square,
+	t_star,
+	t_bit_or,
+	t_log_and,
+	t_log_or,
+	t_log_not,
+	t_lt,
+	t_gt,
+	t_le,
+	t_ge,
+	t_lshift,
+	t_rshift,
+	t_dot,
+	t_arrow,
+	t_plus,
+	t_minus,
+	t_minuseq,
+	t_pluseq,
+	t_oreq,
+	t_andeq,
+	t_eq,
+	t_noteq,
+	t_assign,
+	t_plusplus,
+	t_minusminus,
+	t_semicolon,
+	t_eof,
+	t_ampersand,
+	t_return,
+	t_if,
+	t_else,
+	t_while,
+	t_for,
+	t_do,
+	t_op_comment,
+	t_cl_comment,
+	t_define,
+	t_include,
+	t_typedef,
+	t_enum,
+	t_struct,
+	t_sizeof,
+	t_elipsis,
+	t_asm
+} l_token;
+
+char _l_token_string[MAX_TOKEN_LEN];
+l_token _l_next_token;
+
 void l_skip_whitespace()
 {
 	while (is_whitespace(_l_next_char)) {
@@ -56,6 +118,37 @@ l_token l_next_token()
 		if (strcmp(_l_token_string, "#define") == 0) {
 			l_skip_whitespace();
 			return t_define;
+		}
+		if (strcmp(_l_token_string, "#ifdef") == 0) {
+			i = 0;
+			do {
+				_l_token_string[i] = _l_next_char;
+				i++;
+			} while (l_read_char(0) != '\n');
+			_l_token_string[i] = 0;
+			/* check if we have this alias/define */
+			for (i = 0; i < _aliases_idx; i++) {
+				if (strcmp(_l_token_string, _aliases[i].alias) == 0) {
+					l_skip_whitespace();
+					return l_next_token();
+				}
+			}
+			/* skip lines until #endif */
+			do {
+				l_skip_whitespace();
+				i = 0;
+				do {
+					_l_token_string[i] = _l_next_char;
+					i++;
+				} while (l_read_char(0) != '\n');
+				_l_token_string[i] = 0;
+			} while (strcmp(_l_token_string, "#endif") != 0);
+			l_skip_whitespace();
+			return l_next_token();
+		}
+		if (strcmp(_l_token_string, "#endif") == 0) {
+			l_skip_whitespace();
+			return l_next_token();
 		}
 		error("Unknown directive");
 	}

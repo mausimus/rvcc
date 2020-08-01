@@ -2,23 +2,27 @@
 
 #define NULL 0
 
-typedef int FILE; /* TODO: struct */
+#ifdef __RISCV
+#define __syscall_exit 93
+#define __syscall_read 63
+#define __syscall_write 64
+#define __syscall_close 57
+#define __syscall_open 1024
+#define __syscall_brk 214
+#endif
+
+#ifdef __ARM
+#define __syscall_exit 1
+#define __syscall_read 3
+#define __syscall_write 4
+#define __syscall_close 6
+#define __syscall_open 5
+#define __syscall_brk 45
+#endif
+
+typedef int FILE;
 
 void abort();
-
-int syscall(int no, ...)
-{
-	/* no into a7, then all params from a0 */
-	_asm(0x00050893); /*             addi           a7, a0, 0*/
-	_asm(0x00058513); /*             addi           a0, a1, 0*/
-	_asm(0x00060593); /*             addi           a1, a2, 0*/
-	_asm(0x00068613); /*             addi           a2, a3, 0*/
-	_asm(0x00070693); /*             addi           a3, a4, 0*/
-	_asm(0x00078713); /*             addi           a4, a5, 0*/
-	_asm(0x00080793); /*             addi           a5, a6, 0*/
-	_asm(0x00000073); /*             ecall*/
-	return;
-}
 
 int strlen(char *str)
 {
@@ -88,7 +92,7 @@ char *strncpy(char *dest, char *src, int len)
 }
 
 /* set 10 digits (32bit) without div */
-void _render10(char *pb, int val)
+void __render10(char *pb, int val)
 {
 	int neg = 0;
 
@@ -149,7 +153,7 @@ void _render10(char *pb, int val)
 	}
 }
 
-void _render16(char *pb, int val)
+void __render16(char *pb, int val)
 {
 	int c = 9;
 	while (c > 0) {
@@ -166,7 +170,7 @@ void _render16(char *pb, int val)
 	}
 }
 
-int _format(char *buffer, int val, int width, int zeropad, int base, int hexprefix)
+int __format(char *buffer, int val, int width, int zeropad, int base, int hexprefix)
 {
 	int bi = 0;
 	char pb[10];
@@ -190,9 +194,9 @@ int _format(char *buffer, int val, int width, int zeropad, int base, int hexpref
 	}
 
 	if (base == 10) {
-		_render10(pb, val);
+		__render10(pb, val);
 	} else if (base == 16) {
-		_render16(pb, val);
+		__render16(pb, val);
 	} else {
 		abort();
 	}
@@ -291,18 +295,18 @@ void printf(char *str, ...)
 			} else if (str[si] == 'd') {
 				/* append param as decimal */
 				int v = var_args[pi];
-				bi += _format(buffer + bi, v, w, zp, 10, 0);
+				bi += __format(buffer + bi, v, w, zp, 10, 0);
 			} else if (str[si] == 'x') {
 				/* append param as hex */
 				int v = var_args[pi];
-				bi += _format(buffer + bi, v, w, zp, 16, pp);
+				bi += __format(buffer + bi, v, w, zp, 16, pp);
 			}
 			pi--;
 			si++;
 		}
 	}
 	buffer[bi] = 0;
-	syscall(64, 0, buffer, bi);
+	__syscall(__syscall_write, 0, buffer, bi);
 }
 
 char *memcpy(char *dest, char *src, int count)
@@ -317,7 +321,7 @@ char *memcpy(char *dest, char *src, int count)
 
 void exit(int exit_code)
 {
-	syscall(93, exit_code);
+	__syscall(__syscall_exit, exit_code);
 }
 
 void abort()
@@ -332,23 +336,23 @@ void abort()
 FILE *fopen(char *filename, char *mode)
 {
 	if (strcmp(mode, "wb") == 0) {
-		return syscall(1024, filename, 65, 0x1c0);
+		return __syscall(__syscall_open, filename, 65, 0x1c0);
 	} else if (strcmp(mode, "rb") == 0) {
-		return syscall(1024, filename, 0, 0);
+		return __syscall(__syscall_open, filename, 0, 0);
 	}
 	abort();
 }
 
 int fclose(FILE *stream)
 {
-	syscall(57, stream);
+	__syscall(__syscall_close, stream);
 	return 0;
 }
 
 int fgetc(FILE *stream)
 {
 	char buf;
-	int r = syscall(63, stream, &buf, 1);
+	int r = __syscall(__syscall_read, stream, &buf, 1);
 	if (r <= 0) {
 		return -1;
 	}
@@ -361,7 +365,7 @@ char *fgets(char *str, int n, FILE *stream)
 	char c;
 	do {
 		c = fgetc(stream);
-		if (c == -1) {
+		if (c == -1 || c == 255) {
 			if (i == 0) {
 				/* EOF on first char */
 				return NULL;
@@ -382,7 +386,7 @@ int fputc(int c, FILE *stream)
 {
 	char buf[1];
 	buf[0] = c;
-	syscall(64, stream, &buf, 1);
+	__syscall(__syscall_write, stream, &buf, 1);
 	return 0;
 }
 
@@ -398,7 +402,7 @@ int fputs(char *str, FILE *stream)
 
 void *malloc(int size)
 {
-	int brk = syscall(214, 0); /* read current break */
-	syscall(214, brk + size); /* increment */
+	int brk = __syscall(__syscall_brk, 0); /* read current break */
+	__syscall(__syscall_brk, brk + size); /* increment */
 	return brk; /* return previous location, now extended by size */
 }

@@ -1,11 +1,11 @@
 ## rvcc
 
-Bootstrapped C compiler for 32-bit RISC-V ISA
+Bootstrapped C compiler for 32-bit RISC-V and ARM ISAs
 
 ### Features
 
 * implements a subset of C language sufficient to compile itself
-* generates a Linux- and emulator-compatible RV32IM ELF binary
+* generates Linux- and emulator-friendly ELF binaries (RV32IM/ARMv7)
 * written in ANSI C it can cross-compile from any platform
 * includes a minimal Linux C standard library for basic I/O
 * simple two-pass compilation process: source -> IL -> binary
@@ -13,11 +13,11 @@ Bootstrapped C compiler for 32-bit RISC-V ISA
 
 ### Bootstrapping
 
-Bootstrapped compiler is a compiler that's able to compile its own source code, which is an important step in verification. Since rvcc is written in ANSI C, we can use any compiler on any platform for the initial compilation before bootstrapping with the help of a RISC-V emulator.
+Bootstrapped compiler is a compiler that's able to compile its own source code, which is an important verification milestone. Since rvcc is written in ANSI C, we can use any compiler on any platform for the initial compilation before bootstrapping with the help of RISC-V and/or ARM emulators.
 
 ![diagram](bootstrap.png)
 
-The steps to validate rvcc's bootstrap are:
+The steps to validate rvcc's bootstrap on RISC-V are:
 
 1. Compiler's source code is initially compiled using gcc which generates an x86 binary.
 
@@ -27,21 +27,23 @@ The steps to validate rvcc's bootstrap are:
 
 4. If outputs generated in steps 2. and 3. are identical then bootstrap has been successful - the compiler regenerated itself from its own source code in two consecutive generations.
 
-The bootstrap can be tested by running ```make bootstrap``` (requires gcc and rv8 RISC-V emulator installed):
+The bootstrap can be tested by running ```make bootstrap-riscv``` (requires gcc and rv8 RISC-V emulator installed):
 
 ```sh
 user@ubuntu:~/rvcc$ make bootstrap
 gcc -ansi -pedantic -m32 -Wall -Wextra -g -Llib -o bin/rvcc src/rvcc.c
-bin/rvcc -o bin/rvcc_1.elf -Llib src/rvcc.c
-rv-jit -- bin/rvcc_1.elf -o bin/rvcc_2.elf -Llib src/rvcc.c
+bin/rvcc -o bin/rvcc_1.elf -march=riscv -Llib src/rvcc.c
+rv-jit -- bin/rvcc_1.elf -o bin/rvcc_2.elf -march=riscv -Llib src/rvcc.c
 diff -q bin/rvcc_1.elf bin/rvcc_2.elf
 Files are the same - bootstrap successful!
 ```
 
+Bootstrapping on ARM follows the same process and the test can be run via ```make bootstrap-arm``` (requires qemu-arm-static installed). To run both bootstraps use ```make bootstrap```.
+
 ### Output
 
-The compiler generates an RV32IM binary without going through an explicit assembly step, it directly encodes all
-RISC-V instructions and packages them into an ELF file.
+The compiler generates an executable binary file without going through an explicit assembly step, it directly encodes all
+RISC-V/ARM instructions and packages them into an ELF file.
 The generated executable includes a symbol table so by using a disassembler it's possible to
 peek into the machine code for introspection. The compiler also generates a listing of its internal
 IL representation for debugging purposes.
@@ -52,16 +54,17 @@ including proxying system calls for I/O. The usage is:
 
 `rv-jit <elf_file>`
 
-To disassemble a binary:
+To disassemble a RISC-V binary:
 
 `rv-bin dump -d <elf_file>`
 
-### RISC-V
+To run ARM on x86 you can use [qemu user emulation](https://wiki.debian.org/QemuUserEmulation) through qemu-arm-static.
 
-[RISC-V](https://en.wikipedia.org/wiki/RISC-V) is an open source Instruction Set Architecture,
-an alternative to the likes of x86 and ARM, which can be used freely without any licenses required. It's a RISC
-architecture meaning the only instructions that operate on memory are simple loads and stores, with all
-other instructions operating only on registers (32 of them) and immediate values.
+`qemu-arm-static <elf_file>`
+
+To disassemble an ARM binary you can use the GNU toolchain:
+
+`arm-linux-gnueabi-objdump -d <elf_file>`
 
 ### Code
 
@@ -73,9 +76,23 @@ Compiler sequentially translates C source code into IL and then binary meaning i
 all the way to the binary with only jumps and glue logic being inserted. This makes some language constructs
 (for example for loops or some comparisons) quite inefficient due to excessive jumps but compiler's design stays very simple.
 
-### Example
+#### RISC-V
 
-Sample code generated for a recursive Fibonacci sequence function.
+[RISC-V](https://en.wikipedia.org/wiki/RISC-V) is an open source Instruction Set Architecture,
+an alternative to the likes of x86 and ARM, which can be used freely without any licenses required. It's a RISC
+architecture meaning the only instructions that operate on memory are simple loads and stores, with all
+other instructions operating only on registers (32 of them) and immediate values.
+
+#### ARM
+
+ARM output generates code compatible with ARMv7 ISA which is owned by [Arm Holdings](https://www.arm.com/). Similarly to RISC-V,
+ARM is a RISC ISA but it offers a wider variety of operations by adding conditional execution codes, automatic index increments, 
+value shifts etc. to many instructions resulting in potentially denser code (fewer instructions required), at the expense of reducing
+the number of bits available for immediate values.
+
+### Example RISC-V output
+
+Sample RISC-V binary code generated for a recursive Fibonacci sequence function.
 
 ```asm
  C Source              Internal IL      Binary     Disassembly                Comment
@@ -140,10 +157,10 @@ Sample code generated for a recursive Fibonacci sequence function.
 
 Aim of the project is purely recreational/educational and thanks are due to:
 
-* RISC-V International for the RISC-V initiative: https://riscv.org/
+* [RISC-V International](https://riscv.org/) for the RISC-V initiative
 
-* K&R for giving the world C language
+* K&R for giving the world C language (here we are 40 years later...)
 
-* rv8 team for a great emulation environment: https://github.com/rv8-io/rv8
+* [rv8](https://github.com/rv8-io/rv8) and [qemu](https://www.qemu.org/) teams for a great emulation environments
 
-* everyone else who supports RISC-V!
+* everyone else who supports RISC architectures!

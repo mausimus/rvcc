@@ -7,16 +7,18 @@
 #include "defs.c"
 #include "globals.c"
 #include "helpers.c"
-#include "source.c"
 #include "lexer.c"
+#include "source.c"
 #include "elf.c"
 #include "riscv.c"
+#include "arm.c"
 #include "parser.c"
 #include "codegen.c"
 
 int main(int argc, char *argv[])
 {
 	int i = 1, clib = 1;
+	arch_t arch = a_riscv;
 	char *outfile = NULL, *infile = NULL, *libpath = NULL;
 
 	printf("rvcc C compiler\n");
@@ -24,6 +26,8 @@ int main(int argc, char *argv[])
 	while (i < argc) {
 		if (strcmp(argv[i], "-noclib") == 0) {
 			clib = 0;
+		} else if (strcmp(argv[i], "-march=arm") == 0) {
+			arch = a_arm;
 		} else if (strncmp(argv[i], "-L", 2) == 0) {
 			libpath = argv[i] + 2;
 		} else if (strcmp(argv[i], "-o") == 0) {
@@ -41,7 +45,7 @@ int main(int argc, char *argv[])
 
 	if (infile == NULL) {
 		printf("Missing source file!\n");
-		printf("Usage: rvcc [-o outfile] [-noclib] [-Llibpath] <infile.c>>\n");
+		printf("Usage: rvcc [-o outfile] [-noclib] [-Llibpath] [-march=riscv|arm] <infile.c>\n");
 		return -1;
 	}
 
@@ -65,17 +69,17 @@ int main(int argc, char *argv[])
 	printf("Loaded %d source bytes\n", _source_idx);
 
 	/* parse source into IL */
-	p_parse();
+	p_parse(arch);
 
 	printf("Parsed into %d IL instructions\n", _il_idx);
 
 	/* generate code from IL */
-	c_generate();
+	c_generate(arch);
 
 	printf("Compiled into %d code bytes and %d data bytes\n", _e_code_idx, _e_data_idx);
 
 	/* output code in ELF */
-	e_generate(outfile);
+	e_generate(outfile, arch);
 
 	return 0;
 }
