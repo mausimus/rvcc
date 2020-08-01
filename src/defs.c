@@ -25,6 +25,8 @@
 #define MAX_FOOTER 1024
 #define MAX_ALIASES 1024
 #define MAX_CONSTANTS 1024
+#define MAX_CASES 128
+#define MAX_NESTING 128
 
 #define ELF_START 0x10000
 #define PTR_SIZE 4

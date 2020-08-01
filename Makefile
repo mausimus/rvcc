@@ -64,4 +64,5 @@ bootstrap: bootstrap-riscv bootstrap-arm
 	fi	
 
 $(BIN)/$(EXECUTABLE): $(OBJECTS)
+	mkdir -p $(BIN)
 	$(CC) $(CFLAGS) $(CLIBS) $^ -o $@ $(LIBRARIES)

@@ -877,6 +877,92 @@ void p_read_body_statement(block_def *parent)
 		return;
 	}
 
+	if (l_accept(t_switch)) {
+		int case_values[MAX_CASES];
+		int case_il_idxs[MAX_CASES];
+		int case_idx = 0;
+		int default_il_idx = 0;
+		int i;
+		il_instr *jump_to_check;
+		il_instr *switch_exit;
+
+		l_expect(t_op_bracket);
+		p_read_expression(1, parent);
+		l_expect(t_cl_bracket);
+
+		jump_to_check = add_instr(op_jump);
+
+		/* create exit jump for breaks */
+		switch_exit = add_instr(op_jump);
+		switch_exit->string_param1 = "switch_exit";
+		_p_break_exit_il_idxs[_p_break_level] = switch_exit->il_index;
+		_p_break_level++;
+
+		l_expect(t_op_curly);
+		while (l_peek(t_default, NULL) || l_peek(t_case, NULL)) {
+			if (l_accept(t_default)) {
+				ii = add_instr(op_label);
+				ii->string_param1 = "default";
+				default_il_idx = ii->il_index;
+			} else {
+				int case_val;
+
+				l_accept(t_case);
+				case_val = p_read_numeric_constant(_l_token_string);
+				ii = add_instr(op_label);
+				ii->string_param1 = "case";
+				case_values[case_idx] = case_val;
+				case_il_idxs[case_idx] = ii->il_index;
+				case_idx++;
+				l_expect(t_numeric); /* already read it */
+			}
+			l_expect(t_colon);
+
+			/* body is optional, can be another case */
+			while (!l_peek(t_case, NULL) && !l_peek(t_cl_curly, NULL) && !l_peek(t_default, NULL)) {
+				p_read_body_statement(parent);
+				/* should end with a break which will generate jump out */
+			}
+		}
+		l_expect(t_cl_curly);
+
+		ii = add_instr(op_label);
+		ii->string_param1 = "switch_check";
+		jump_to_check->int_param1 = ii->il_index;
+
+		/* perform checks against a1 */
+		for (i = 0; i < case_idx; i++) {
+			ii = add_instr(op_load_numeric_constant);
+			ii->param_no = 0;
+			ii->int_param1 = case_values[i];
+			ii = add_instr(op_equals);
+			ii->param_no = 0;
+			ii->int_param1 = 1;
+			ii = add_instr(op_jnz);
+			ii->param_no = 0;
+			ii->int_param1 = case_il_idxs[i];
+		}
+		/* jump to default */
+		if (default_il_idx != 0) {
+			ii = add_instr(op_jump);
+			ii->int_param1 = default_il_idx;
+		}
+
+		_p_break_level--;
+
+		/* exit where breaks should exit to */
+		ii = add_instr(op_label);
+		ii->string_param1 = "switch_end";
+		switch_exit->int_param1 = ii->il_index;
+
+		return;
+	}
+
+	if (l_accept(t_break)) {
+		ii = add_instr(op_jump);
+		ii->int_param1 = _p_break_exit_il_idxs[_p_break_level - 1];
+	}
+
 	if (l_accept(t_for)) {
 		char token[MAX_VAR_LEN];
 		il_instr *condition_start;
@@ -910,7 +996,9 @@ void p_read_body_statement(block_def *parent)
 		}
 
 		condition_jump_out = add_instr(op_jz); /* jump out if zero */
+		condition_jump_out->param_no = 0;
 		condition_jump_in = add_instr(op_jump); /* else jump to body */
+		condition_jump_in->param_no = 0;
 
 		/* increment after each loop */
 		increment = add_instr(op_label);

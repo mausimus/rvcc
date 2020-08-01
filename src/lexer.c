@@ -38,6 +38,7 @@ typedef enum {
 	t_assign,
 	t_plusplus,
 	t_minusminus,
+	t_colon,
 	t_semicolon,
 	t_eof,
 	t_ampersand,
@@ -56,7 +57,11 @@ typedef enum {
 	t_struct,
 	t_sizeof,
 	t_elipsis,
-	t_asm
+	t_asm,
+	t_switch,
+	t_case,
+	t_break,
+	t_default
 } l_token;
 
 char _l_token_string[MAX_TOKEN_LEN];
@@ -385,6 +390,10 @@ l_token l_next_token()
 		l_read_char(1);
 		return t_semicolon;
 	}
+	if (_l_next_char == ':') {
+		l_read_char(1);
+		return t_colon;
+	}
 	if (_l_next_char == '=') {
 		l_read_char(0);
 		if (_l_next_char == '=') {
@@ -436,6 +445,18 @@ l_token l_next_token()
 		}
 		if (strcmp(_l_token_string, "sizeof") == 0) {
 			return t_sizeof;
+		}
+		if (strcmp(_l_token_string, "switch") == 0) {
+			return t_switch;
+		}
+		if (strcmp(_l_token_string, "case") == 0) {
+			return t_case;
+		}
+		if (strcmp(_l_token_string, "break") == 0) {
+			return t_break;
+		}
+		if (strcmp(_l_token_string, "default") == 0) {
+			return t_default;
 		}
 		if (strcmp(_l_token_string, "#define") == 0) {
 			return t_define;

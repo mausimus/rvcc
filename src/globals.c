@@ -23,6 +23,8 @@ int _source_idx;
 char _l_next_char;
 
 int _c_block_level;
+int _p_break_level;
+int *_p_break_exit_il_idxs;
 
 variable_def *_temp_variable;
 
@@ -263,6 +265,7 @@ void g_initialize()
 	_blocks_idx = 0;
 	_types_idx = 0;
 	_functions_idx = 0;
+	_p_break_level = 0;
 
 	_e_code_start = ELF_START + _e_header_len;
 
@@ -280,6 +283,7 @@ void g_initialize()
 	_aliases = malloc(MAX_ALIASES * sizeof(alias_def));
 	_constants = malloc(MAX_CONSTANTS * sizeof(constant_def));
 	_temp_variable = malloc(sizeof(variable_def));
+	_p_break_exit_il_idxs = malloc(MAX_NESTING * sizeof(int));
 }
 
 void error(char *msg)

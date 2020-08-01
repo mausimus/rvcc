@@ -617,7 +617,7 @@ void c_generate(arch_t arch)
 			int ofs = jump_location - pc - 4;
 
 			if (arch == a_arm) {
-				c_emit(a_teq(a_r0));
+				c_emit(a_teq(dest_reg));
 				if (op == op_jz) {
 					c_emit(a_b(ac_eq, ofs));
 					printf("  if 0 -> %d", ii->int_param1);
@@ -630,21 +630,21 @@ void c_generate(arch_t arch)
 					/* near jump (branch) */
 					if (op == op_jz) {
 						c_emit(r_nop());
-						c_emit(r_beq(r_a0, r_zero, ofs));
+						c_emit(r_beq(dest_reg, r_zero, ofs));
 						printf("  if 0 -> %d", ii->int_param1);
 					} else {
 						c_emit(r_nop());
-						c_emit(r_bne(r_a0, r_zero, ofs));
+						c_emit(r_bne(dest_reg, r_zero, ofs));
 						printf("  if 1 -> %d", ii->int_param1);
 					}
 				} else {
 					/* far jump */
 					if (op == op_jz) {
-						c_emit(r_bne(r_a0, r_zero, 8)); /* skip next instruction */
+						c_emit(r_bne(dest_reg, r_zero, 8)); /* skip next instruction */
 						c_emit(r_jal(r_zero, ofs));
 						printf("  if 0 --> %d", ii->int_param1);
 					} else {
-						c_emit(r_beq(r_a0, r_zero, 8));
+						c_emit(r_beq(dest_reg, r_zero, 8));
 						c_emit(r_jal(r_zero, ofs));
 						printf("  if 1 --> %d", ii->int_param1);
 					}

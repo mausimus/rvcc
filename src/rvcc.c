@@ -10,8 +10,8 @@
 #include "lexer.c"
 #include "source.c"
 #include "elf.c"
-#include "riscv.c"
-#include "arm.c"
+#include "arch/riscv.c"
+#include "arch/arm.c"
 #include "parser.c"
 #include "codegen.c"
 
