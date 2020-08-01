@@ -251,28 +251,17 @@ void c_generate(arch_t arch)
 
 		if (op == op_load_data_address) {
 			/* lookup address of a constant in data section as offset from PC */
-			int ofs = data_start + ii->int_param1 - pc;
-
 			if (arch == a_arm) {
-				ofs = code_start + data_start + ii->int_param1;
+				int ofs = code_start + data_start + ii->int_param1;
 				c_emit(a_movw(ac_al, dest_reg, ofs));
 				c_emit(a_movt(ac_al, dest_reg, ofs));
-
-				/*ofs -= 8; prefetch
-				if (ofs >= 0) {
-					c_emit(a_add_i(ac_al, dest_reg, a_pc, a_hi(ofs)));
-					c_emit(a_add_i(ac_al, dest_reg, dest_reg, a_lo(ofs)));
-				} else {
-					ofs = -ofs;
-					c_emit(a_sub_i(ac_al, dest_reg, a_pc, a_hi(ofs)));
-				*/
-				/*c_emit(a_sub_i(ac_al, dest_reg, dest_reg, a_lo(ofs)));*/
 			} else {
+				int ofs = data_start + ii->int_param1 - pc;
 				c_emit(r_auipc(dest_reg, r_hi(ofs)));
 				c_emit(r_addi(dest_reg, dest_reg, r_lo(ofs)));
 			}
 
-			printf("  x%d := &data[%d] @ PC+%d", dest_reg, ii->int_param1, ofs);
+			printf("  x%d := &data[%d]", dest_reg, ii->int_param1);
 		}
 		if (op == op_load_numeric_constant) {
 			/* load numeric constant */
@@ -425,8 +414,8 @@ void c_generate(arch_t arch)
 		}
 		if (op == op_push) {
 			if (arch == a_arm) {
-				c_emit(a_add_i(ac_al, r_sp, r_sp, -16)); /* 16 aligned although we only need 4 */
-				c_emit(a_sw(ac_al, dest_reg, r_sp, 0));
+				c_emit(a_add_i(ac_al, a_sp, a_sp, -16)); /* 16 aligned although we only need 4 */
+				c_emit(a_sw(ac_al, dest_reg, a_sp, 0));
 			} else {
 				c_emit(r_addi(r_sp, r_sp, -16)); /* 16 aligned although we only need 4 */
 				c_emit(r_sw(dest_reg, r_sp, 0));
@@ -436,8 +425,8 @@ void c_generate(arch_t arch)
 		}
 		if (op == op_pop) {
 			if (arch == a_arm) {
-				c_emit(a_lw(ac_al, dest_reg, r_sp, 0));
-				c_emit(a_add_i(ac_al, r_sp, r_sp, 16)); /* 16 aligned although we only need 4 */
+				c_emit(a_lw(ac_al, dest_reg, a_sp, 0));
+				c_emit(a_add_i(ac_al, a_sp, a_sp, 16)); /* 16 aligned although we only need 4 */
 			} else {
 				c_emit(r_lw(dest_reg, r_sp, 0));
 				c_emit(r_addi(r_sp, r_sp, 16)); /* 16 aligned although we only need 4 */
@@ -561,35 +550,63 @@ void c_generate(arch_t arch)
 		if (op == op_log_and || op == op_log_or) {
 			if (op == op_log_and) {
 				/* we assume both have to be 1, they can't be just nonzero */
-				c_emit(r_and(dest_reg, dest_reg, op_reg));
+				if (arch == a_arm)
+					c_emit(a_and_r(ac_al, dest_reg, dest_reg, op_reg));
+				else
+					c_emit(r_and(dest_reg, dest_reg, op_reg));
+
 				printf("  x%d &&= x%d", dest_reg, op_reg);
 			} else if (op == op_log_or) {
-				c_emit(r_or(dest_reg, dest_reg, op_reg));
+				if (arch == a_arm)
+					c_emit(a_or_r(ac_al, dest_reg, dest_reg, op_reg));
+				else
+					c_emit(r_or(dest_reg, dest_reg, op_reg));
+
 				printf("  x%d ||= x%d", dest_reg, op_reg);
 			}
 		}
 		if (op == op_bit_and || op == op_bit_or) {
 			if (op == op_bit_and) {
-				c_emit(r_and(dest_reg, dest_reg, op_reg));
+				if (arch == a_arm)
+					c_emit(a_and_r(ac_al, dest_reg, dest_reg, op_reg));
+				else
+					c_emit(r_and(dest_reg, dest_reg, op_reg));
+
 				printf("  x%d &= x%d", dest_reg, op_reg);
 			} else if (op == op_bit_or) {
-				c_emit(r_or(dest_reg, dest_reg, op_reg));
+				if (arch == a_arm)
+					c_emit(a_or_r(ac_al, dest_reg, dest_reg, op_reg));
+				else
+					c_emit(r_or(dest_reg, dest_reg, op_reg));
+
 				printf("  x%d |= x%d", dest_reg, op_reg);
 			}
 		}
 		if (op == op_bit_lshift || op == op_bit_rshift) {
 			if (op == op_bit_lshift) {
-				c_emit(r_sll(dest_reg, dest_reg, op_reg));
+				if (arch == a_arm)
+					c_emit(a_sll(ac_al, dest_reg, dest_reg, op_reg));
+				else
+					c_emit(r_sll(dest_reg, dest_reg, op_reg));
+
 				printf("  x%d <<= x%d", dest_reg, op_reg);
 			} else if (op == op_bit_rshift) {
-				c_emit(r_srl(dest_reg, dest_reg, op_reg));
+				if (arch == a_arm)
+					c_emit(a_srl(ac_al, dest_reg, dest_reg, op_reg));
+				else
+					c_emit(r_srl(dest_reg, dest_reg, op_reg));
+
 				printf("  x%d >>= x%d", dest_reg, op_reg);
 			}
 		}
 		if (op == op_not) {
 			/* 1 if zero, 0 if nonzero */
-			/* only works for small range integers */
-			c_emit(r_sltiu(dest_reg, dest_reg, 1));
+			if (arch == a_arm)
+				/* only works for 1/0 */
+				c_emit(a_rsb_i(ac_al, dest_reg, 1, dest_reg));
+			else
+				/* only works for small range integers */
+				c_emit(r_sltiu(dest_reg, dest_reg, 1));
 			printf("  !x%d", dest_reg);
 		}
 		if (op == op_jz || op == op_jnz) {

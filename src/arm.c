@@ -111,6 +111,26 @@ int a_mov(ar_cond cond, int io, int opcode, int s, int rn, int rd, int op2)
 	return a_encode(cond, s + (opcode << 1) + (io << 5), rn, rd, (shift << 8) + (op2 & 255));
 }
 
+int a_and_i(ar_cond cond, a_reg rd, a_reg rs, int imm)
+{
+	return a_mov(cond, 1, ar_and, 0, rs, rd, imm);
+}
+
+int a_or_i(ar_cond cond, a_reg rd, a_reg rs, int imm)
+{
+	return a_mov(cond, 1, ar_orr, 0, rs, rd, imm);
+}
+
+int a_and_r(ar_cond cond, a_reg rd, a_reg rs, a_reg rm)
+{
+	return a_mov(cond, 0, ar_and, 0, rs, rd, rm);
+}
+
+int a_or_r(ar_cond cond, a_reg rd, a_reg rs, a_reg rm)
+{
+	return a_mov(cond, 0, ar_orr, 0, rs, rd, rm);
+}
+
 int a_movw(ar_cond cond, a_reg rd, int imm)
 {
 	return a_encode(cond, 48, 0, rd, 0) + a_extract_bits(imm, 0, 11, 0, 11) + a_extract_bits(imm, 12, 15, 16, 19);
@@ -130,6 +150,16 @@ int a_mov_i(ar_cond cond, a_reg rd, int imm)
 int a_mov_r(ar_cond cond, a_reg rd, a_reg rs)
 {
 	return a_mov(cond, 0, ar_mov, 0, 0, rd, rs);
+}
+
+int a_srl(ar_cond cond, a_reg rd, a_reg rm, a_reg rs)
+{
+	return a_encode(cond, 0 + (ar_mov << 1) + (0 << 5), 0, rd, rm + (1 << 4) + (1 << 5) + (rs << 8));
+}
+
+int a_sll(ar_cond cond, a_reg rd, a_reg rm, a_reg rs)
+{
+	return a_encode(cond, 0 + (ar_mov << 1) + (0 << 5), 0, rd, rm + (1 << 4) + (0 << 5) + (rs << 8));
 }
 
 int a_add_i(ar_cond cond, a_reg rd, a_reg rs, int imm)
