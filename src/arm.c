@@ -77,18 +77,6 @@ int a_encode(ar_cond cond, int opcode, int rn, int rd, int op2)
 	return (cond << 28) + (opcode << 20) + (rn << 16) + (rd << 12) + op2;
 }
 
-int a_hi(int val)
-{
-	/* strip lower 8 bits */
-	return val - (val & 255);
-}
-
-int a_lo(int val)
-{
-	/* lowest 8 value bits */
-	return val & 255;
-}
-
 int a_swi()
 {
 	return a_encode(ac_al, 240, 0, 0, 0);
@@ -98,14 +86,14 @@ int a_mov(ar_cond cond, int io, int opcode, int s, int rn, int rd, int op2)
 {
 	int shift = 0;
 	if (op2 > 255) {
-		if ((op2 & 255) != 0) {
-			error("Unable to represent value");
-		} else if (op2 > 65535) {
-			error("Unable to represent value");
-		} else {
-			/* we are setting bits 8-15 */
-			op2 = op2 >> 8;
-			shift = 12; /* extend right 24 bits */
+		shift = 16; /* full rotation */
+		while ((op2 & 3) == 0) {
+			/* we can shift by two bits */
+			op2 = op2 >> 2;
+			shift -= 1;
+		}
+		if (op2 > 255) {
+			error("Unable to represent value"); /* value spans more than 8 bits */
 		}
 	}
 	return a_encode(cond, s + (opcode << 1) + (io << 5), rn, rd, (shift << 8) + (op2 & 255));

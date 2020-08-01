@@ -365,7 +365,7 @@ char *fgets(char *str, int n, FILE *stream)
 	char c;
 	do {
 		c = fgetc(stream);
-		if (c == -1) {
+		if (c == -1 || c == 255) {
 			if (i == 0) {
 				/* EOF on first char */
 				return NULL;

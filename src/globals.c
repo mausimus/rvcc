@@ -131,6 +131,13 @@ type_def *add_type()
 	return type;
 }
 
+type_def *add_named_type(char *name)
+{
+	type_def *type = add_type();
+	strcpy(type->type_name, name);
+	return type;
+}
+
 void add_constant(char alias[], int value)
 {
 	constant_def *constant = &_constants[_constants_idx];

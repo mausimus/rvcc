@@ -26,24 +26,23 @@ void p_initialize(arch_t arch)
 	type_def *type;
 	function_def *fn;
 
-	type = add_type();
-	strcpy(type->type_name, "void");
+	/* built-in types */
+	type = add_named_type("void");
 	type->base_type = bt_void;
 	type->size = 0;
 
-	type = add_type();
-	strcpy(type->type_name, "char");
+	type = add_named_type("char");
 	type->base_type = bt_char;
 	type->size = 1;
 
-	type = add_type();
-	strcpy(type->type_name, "int");
+	type = add_named_type("int");
 	type->base_type = bt_int;
 	type->size = 4;
 
 	add_block(NULL, NULL); /* global block */
 	e_add_symbol("", 0, 0); /* undef symbol */
 
+	/* architecutre define */
 	if (arch == a_arm)
 		add_alias("__ARM", "1");
 	else
@@ -59,6 +58,7 @@ void p_initialize(arch_t arch)
 	ii->string_param1 = "__exit";
 	add_instr(op_exit);
 
+	/* Linux syscall */
 	fn = add_function("__syscall");
 	fn->num_params = 0;
 	ii = add_instr(op_entry_point);

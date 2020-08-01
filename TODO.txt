@@ -1,0 +1,6 @@
+* ensure any non-zero value is treated as logical truth by all ops
+* replace IL list with AST to fully evaluate expressions
+* add another code generation pass to allow variable instruction length
+* lazy expression evaluation
+* function pointers to make multiple architectures cleaner
+* preprocessor

@@ -29,16 +29,39 @@ tests/%.elf: tests/%.c
 
 tests: all $(TESTBINS)
 
-
-bootstrap: all
-	./$(BIN)/$(EXECUTABLE) -o $(BIN)/rvcc_1.elf -L$(LIBDIRS) $(SRC)/rvcc.c >$(BIN)/rvcc_1.log
-	rv-jit -- $(BIN)/rvcc_1.elf -o $(BIN)/rvcc_2.elf -L$(LIBDIRS) $(SRC)/rvcc.c >$(BIN)/rvcc_2.log 2>&1
-	diff -q $(BIN)/rvcc_1.elf $(BIN)/rvcc_2.elf
-	@if diff -q $(BIN)/rvcc_1.elf $(BIN)/rvcc_2.elf; then \
-	echo "Files are the same - bootstrap successful!"; \
+bootstrap-riscv: all
+	./$(BIN)/$(EXECUTABLE) -o $(BIN)/rvcc_riscv_1.elf -march=riscv -L$(LIBDIRS) $(SRC)/rvcc.c >$(BIN)/rvcc_riscv_1.log
+	chmod a+x $(BIN)/rvcc_riscv_1.elf
+	rv-jit -- $(BIN)/rvcc_riscv_1.elf -o $(BIN)/rvcc_riscv_2.elf -march=riscv -L$(LIBDIRS) $(SRC)/rvcc.c >$(BIN)/rvcc_riscv_2.log 2>&1
+	diff -q $(BIN)/rvcc_riscv_1.elf $(BIN)/rvcc_riscv_2.elf
+	@if diff -q $(BIN)/rvcc_riscv_1.elf $(BIN)/rvcc_riscv_2.elf; then \
+	echo "Files are the same - RISC-V bootstrap successful!"; \
 	else \
-	echo "Files are NOT the same - bootstrap unsuccessful."; \
+	echo "Files are NOT the same - RISC-V bootstrap unsuccessful."; \
 	fi
+
+bootstrap-arm: all
+	./$(BIN)/$(EXECUTABLE) -o $(BIN)/rvcc_arm_1.elf -march=arm -L$(LIBDIRS) $(SRC)/rvcc.c >$(BIN)/rvcc_arm_1.log
+	chmod a+x $(BIN)/rvcc_arm_1.elf
+	qemu-arm-static $(BIN)/rvcc_arm_1.elf -o $(BIN)/rvcc_arm_2.elf -march=arm -L$(LIBDIRS) $(SRC)/rvcc.c >$(BIN)/rvcc_arm_2.log 2>&1
+	diff -q $(BIN)/rvcc_arm_1.elf $(BIN)/rvcc_arm_2.elf
+	@if diff -q $(BIN)/rvcc_arm_1.elf $(BIN)/rvcc_arm_2.elf; then \
+	echo "Files are the same - ARM bootstrap successful!"; \
+	else \
+	echo "Files are NOT the same - ARM bootstrap unsuccessful."; \
+	fi
+
+bootstrap: bootstrap-riscv bootstrap-arm
+	@if diff -q $(BIN)/rvcc_riscv_1.elf $(BIN)/rvcc_riscv_2.elf; then \
+	echo "RISC-V bootstrap successful!"; \
+	else \
+	echo "RISC-V bootstrap unsuccessful."; \
+	fi
+	@if diff -q $(BIN)/rvcc_arm_1.elf $(BIN)/rvcc_arm_2.elf; then \
+	echo "ARM bootstrap successful!"; \
+	else \
+	echo "ARM bootstrap unsuccessful."; \
+	fi	
 
 $(BIN)/$(EXECUTABLE): $(OBJECTS)
 	$(CC) $(CFLAGS) $(CLIBS) $^ -o $@ $(LIBRARIES)
