@@ -7,7 +7,7 @@ Bootstrapped C compiler for 32-bit RISC-V and ARM ISAs
 * implements a subset of C language sufficient to compile itself
 * generates executable Linux ELF binaries for RV32IM and ARMv7
 * includes an embedded minimal Linux C standard library for basic I/O
-* no dependencies - it can work as a microcompiler on environments without GCC
+* single binary - a microcompiler for environments without GCC toolchain
 * written in ANSI C it can cross-compile from any platform
 * simple two-pass compilation process: source -> IL -> binary
 * lexer, parser and code generator all implemented by hand
@@ -45,16 +45,14 @@ Bootstrapping on ARM follows the same process and the test can be run via ```mak
 
 `rvcc [-o outfile] [-noclib] [-march=riscv|arm] <infile.c>`
 
--o - output file name (default: out.elf)
-
--noclib - exclude embedded C library (default: include)
-
--march=riscv|arm - output architecture (default: riscv)
+- -o - output file name (default: out.elf)
+- -noclib - exclude embedded C library (default: include)
+- -march=riscv|arm - output architecture (default: riscv)
 
 ### Output
 
-The compiler generates an executable binary file without going through an explicit assembly step, it directly encodes all
-RISC-V/ARM instructions and packages them into an ELF file.
+The compiler generates an executable binary file without going through explicit linking and assembly steps,
+it directly encodes all RISC-V/ARM opcode instructions and packages them in an ELF file.
 The generated executable includes a symbol table so by using a disassembler it's possible to
 peek into the machine code for introspection. The compiler also generates a listing of its internal
 IL representation for debugging purposes.
@@ -101,7 +99,7 @@ ARM is a RISC ISA but it offers a wider variety of operations by adding conditio
 value shifts etc. to many instructions resulting in potentially denser code (fewer instructions required), at the expense of reducing
 the number of bits available for immediate values.
 
-Compiler generates Linux ARMv7 EABI-compliant binaries which can be run directly on a Raspberry Pi (tested on Pi 4 Model B running armv7l).
+The compiler generates Linux ARMv7 EABI-compliant binaries which can be run directly on a Raspberry Pi (verified on Pi 4 Model B running armv7l).
 
 ### Example RISC-V output
 
