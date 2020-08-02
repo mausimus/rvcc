@@ -41,6 +41,14 @@ Files are the same - bootstrap successful!
 
 Bootstrapping on ARM follows the same process and the test can be run via ```make bootstrap-arm``` (requires qemu-arm-static installed). To run both bootstraps use ```make bootstrap```.
 
+### Usage
+
+`rvcc [-o outfile] [-noclib] [-march=riscv|arm] <infile.c>`
+
+-o - output file name (default: out.elf)
+-noclib - exclude embedded C library (default: include)
+-march=riscv|arm - output architecture (default: riscv)
+
 ### Output
 
 The compiler generates an executable binary file without going through an explicit assembly step, it directly encodes all

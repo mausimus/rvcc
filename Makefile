@@ -68,6 +68,13 @@ bootstrap: bootstrap-riscv bootstrap-arm
 	echo "ARM bootstrap unsuccessful."; \
 	fi	
 
+release: bootstrap
+	mkdir -p release
+	rm -f release/*
+	cp bin/rvcc release/rvcc_x86
+	cp bin/rvcc_riscv_1.elf release/rvcc_riscv
+	cp bin/rvcc_arm_1.elf release/rvcc_arm
+
 $(BIN)/$(EXECUTABLE): $(OBJECTS)
 	mkdir -p $(BIN)
 	$(CC) $(CFLAGS) $(CLIBS) $^ -o $@ $(LIBRARIES)
