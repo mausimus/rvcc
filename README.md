@@ -46,7 +46,9 @@ Bootstrapping on ARM follows the same process and the test can be run via ```mak
 `rvcc [-o outfile] [-noclib] [-march=riscv|arm] <infile.c>`
 
 -o - output file name (default: out.elf)
+
 -noclib - exclude embedded C library (default: include)
+
 -march=riscv|arm - output architecture (default: riscv)
 
 ### Output
