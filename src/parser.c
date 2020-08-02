@@ -42,7 +42,7 @@ void p_initialize(arch_t arch)
 	add_block(NULL, NULL); /* global block */
 	e_add_symbol("", 0, 0); /* undef symbol */
 
-	/* architecutre define */
+	/* architecture defines */
 	switch (arch) {
 	case a_arm:
 		add_alias("__ARM", "1");
@@ -255,7 +255,7 @@ void p_read_expression_operand(int param_no, block_def *parent)
 		p_read_numeric_param(param_no, isneg);
 	} else if (l_accept(t_log_not)) {
 		il_instr *ii;
-		p_read_expression(param_no, parent);
+		p_read_expression_operand(param_no, parent);
 		ii = add_instr(op_not);
 		ii->param_no = param_no;
 	} else if (l_accept(t_ampersand)) {
@@ -970,7 +970,7 @@ void p_read_body_statement(block_def *parent)
 			l_expect(t_colon);
 
 			/* body is optional, can be another case */
-			while ((!l_peek(t_case, NULL)) && (!l_peek(t_cl_curly, NULL)) && (!l_peek(t_default, NULL))) {
+			while (!l_peek(t_case, NULL) && !l_peek(t_cl_curly, NULL) && !l_peek(t_default, NULL)) {
 				p_read_body_statement(parent);
 				/* should end with a break which will generate jump out */
 			}
