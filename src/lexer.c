@@ -70,15 +70,13 @@ l_token _l_next_token;
 void l_skip_whitespace()
 {
 	while (is_whitespace(_l_next_char)) {
-		_source_idx++;
-		_l_next_char = _source[_source_idx];
+		_l_next_char = _source[++_source_idx];
 	}
 }
 
 char l_read_char(int skip_whitespace)
 {
-	_source_idx++;
-	_l_next_char = _source[_source_idx];
+	_l_next_char = _source[++_source_idx];
 	if (skip_whitespace == 1)
 		l_skip_whitespace();
 	return _l_next_char;
@@ -88,8 +86,7 @@ int l_read_alnum(char *buffer, int max_len)
 {
 	int bi = 0;
 	while (is_alnum(l_read_char(0))) {
-		buffer[bi] = _l_next_char;
-		bi++;
+		buffer[bi++] = _l_next_char;
 		if (bi >= max_len)
 			error("Length exceeded");
 	}
@@ -103,8 +100,7 @@ l_token l_next_token()
 	if (_l_next_char == '#') {
 		int i = 0;
 		do {
-			_l_token_string[i] = _l_next_char;
-			i++;
+			_l_token_string[i++] = _l_next_char;
 		} while (is_alnum(l_read_char(0)));
 		_l_token_string[i] = 0;
 		l_skip_whitespace();
@@ -112,8 +108,7 @@ l_token l_next_token()
 		if (strcmp(_l_token_string, "#include") == 0) {
 			i = 0;
 			do {
-				_l_token_string[i] = _l_next_char;
-				i++;
+				_l_token_string[i++] = _l_next_char;
 			} while (l_read_char(0) != '\n');
 			l_skip_whitespace();
 			return t_include;
@@ -125,8 +120,7 @@ l_token l_next_token()
 		if (strcmp(_l_token_string, "#ifdef") == 0) {
 			i = 0;
 			do {
-				_l_token_string[i] = _l_next_char;
-				i++;
+				_l_token_string[i++] = _l_next_char;
 			} while (l_read_char(0) != '\n');
 			_l_token_string[i] = 0;
 			/* check if we have this alias/define */
@@ -141,8 +135,7 @@ l_token l_next_token()
 				l_skip_whitespace();
 				i = 0;
 				do {
-					_l_token_string[i] = _l_next_char;
-					i++;
+					_l_token_string[i++] = _l_next_char;
 				} while (l_read_char(0) != '\n');
 				_l_token_string[i] = 0;
 			} while (strcmp(_l_token_string, "#endif") != 0);
@@ -176,8 +169,7 @@ l_token l_next_token()
 	if (is_digit(_l_next_char)) {
 		int i = 0;
 		do {
-			_l_token_string[i] = _l_next_char;
-			i++;
+			_l_token_string[i++] = _l_next_char;
 		} while (is_hex(l_read_char(0)));
 		_l_token_string[i] = 0;
 		l_skip_whitespace();
@@ -232,8 +224,7 @@ l_token l_next_token()
 				else
 					abort();
 			} else {
-				_l_token_string[i] = _l_next_char;
-				i++;
+				_l_token_string[i++] = _l_next_char;
 			}
 			if (_l_next_char == '\\')
 				special = 1;
@@ -404,8 +395,7 @@ l_token l_next_token()
 		char *alias;
 		int i = 0;
 		do {
-			_l_token_string[i] = _l_next_char;
-			i++;
+			_l_token_string[i++] = _l_next_char;
 		} while (is_alnum(l_read_char(0)));
 		_l_token_string[i] = 0;
 		l_skip_whitespace();

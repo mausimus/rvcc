@@ -4,8 +4,7 @@ void s_write_string(char *src)
 {
 	int i = 0;
 	while (src[i] != 0) {
-		_source[_source_idx] = src[i];
-		_source_idx++;
+		_source[_source_idx++] = src[i];
 		i++;
 	}
 }

@@ -3,89 +3,63 @@
 void e_write_footer_string(char *vals, int len)
 {
 	int i;
-	for (i = 0; i < len; i++) {
-		_e_footer[_e_footer_idx] = vals[i];
-		_e_footer_idx++;
-	}
+	for (i = 0; i < len; i++)
+		_e_footer[_e_footer_idx++] = vals[i];
 }
 
 void e_write_data_string(char *vals, int len)
 {
 	int i;
-	for (i = 0; i < len; i++) {
-		_e_data[_e_data_idx] = vals[i];
-		_e_data_idx++;
-	}
+	for (i = 0; i < len; i++)
+		_e_data[_e_data_idx++] = vals[i];
 }
 
 void e_write_header_byte(int val)
 {
-	_e_header[_e_header_idx] = val;
-	_e_header_idx++;
+	_e_header[_e_header_idx++] = val;
 }
 
 void e_write_footer_byte(char val)
 {
-	_e_footer[_e_footer_idx] = val;
-	_e_footer_idx++;
+	_e_footer[_e_footer_idx++] = val;
 }
 
 char e_extract_byte(int v, int b)
 {
-	switch (b) {
-	case 0:
-		return v & 0xFF;
-	case 1:
-		return (v >> 8) & 0xFF;
-	case 2:
-		return (v >> 16) & 0xFF;
-	case 3:
-		return (v >> 24) & 0xFF;
-	default:
-		abort();
-	}
+	return (v >> (b * 8)) & 0xFF;
+}
+
+int e_write_int(char *buf, int idx, int val)
+{
+	int i = 0;
+	for (i = 0; i < 4; i++)
+		buf[idx++] = e_extract_byte(val, i);
+	return idx;
 }
 
 void e_write_header_int(int val)
 {
-	_e_header[_e_header_idx] = e_extract_byte(val, 0);
-	_e_header[_e_header_idx + 1] = e_extract_byte(val, 1);
-	_e_header[_e_header_idx + 2] = e_extract_byte(val, 2);
-	_e_header[_e_header_idx + 3] = e_extract_byte(val, 3);
-	_e_header_idx += 4;
+	_e_header_idx = e_write_int(_e_header, _e_header_idx, val);
 }
 
 void e_write_footer_int(int val)
 {
-	_e_footer[_e_footer_idx] = e_extract_byte(val, 0);
-	_e_footer[_e_footer_idx + 1] = e_extract_byte(val, 1);
-	_e_footer[_e_footer_idx + 2] = e_extract_byte(val, 2);
-	_e_footer[_e_footer_idx + 3] = e_extract_byte(val, 3);
-	_e_footer_idx += 4;
+	_e_footer_idx = e_write_int(_e_footer, _e_footer_idx, val);
 }
 
 void e_write_symbol_int(int val)
 {
-	_e_symtab[_e_symtab_idx] = e_extract_byte(val, 0);
-	_e_symtab[_e_symtab_idx + 1] = e_extract_byte(val, 1);
-	_e_symtab[_e_symtab_idx + 2] = e_extract_byte(val, 2);
-	_e_symtab[_e_symtab_idx + 3] = e_extract_byte(val, 3);
-	_e_symtab_idx += 4;
+	_e_symtab_idx = e_write_int(_e_symtab, _e_symtab_idx, val);
 }
 
 void e_write_code_int(int val)
 {
-	_e_code[_e_code_idx] = e_extract_byte(val, 0);
-	_e_code[_e_code_idx + 1] = e_extract_byte(val, 1);
-	_e_code[_e_code_idx + 2] = e_extract_byte(val, 2);
-	_e_code[_e_code_idx + 3] = e_extract_byte(val, 3);
-	_e_code_idx += 4;
+	_e_code_idx = e_write_int(_e_code, _e_code_idx, val);
 }
 
 void e_write_data_byte(char val)
 {
-	_e_data[_e_data_idx] = val;
-	_e_data_idx++;
+	_e_data[_e_data_idx++] = val;
 }
 
 void e_generate_header(arch_t arch)
@@ -283,8 +257,7 @@ void e_add_symbol(char *symbol, int len, int pc)
 
 	strncpy(_e_strtab + _e_strtab_idx, symbol, len);
 	_e_strtab_idx += len;
-	_e_strtab[_e_strtab_idx] = 0;
-	_e_strtab_idx++;
+	_e_strtab[_e_strtab_idx++] = 0;
 }
 
 void e_output(char *outfile)

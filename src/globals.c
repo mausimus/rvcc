@@ -60,8 +60,7 @@ il_instr *add_instr(il_op op)
 	ii->op = op;
 	ii->op_len = 0;
 	ii->string_param1 = 0;
-	ii->il_index = _il_idx;
-	_il_idx++;
+	ii->il_index = _il_idx++;
 	return ii;
 }
 
@@ -71,28 +70,25 @@ il_instr *add_generic(int generic_op)
 	ii->op = op_generic;
 	ii->int_param1 = generic_op;
 	ii->op_len = 0;
-	ii->il_index = _il_idx;
-	_il_idx++;
+	ii->il_index = _il_idx++;
 	return ii;
 }
 
 block_def *add_block(block_def *parent, function_def *function)
 {
 	block_def *bd = &_blocks[_blocks_idx];
-	bd->bd_index = _blocks_idx;
+	bd->bd_index = _blocks_idx++;
 	bd->parent = parent;
 	bd->function = function;
 	bd->next_local = 0;
-	_blocks_idx++;
 	return bd;
 }
 
 void add_alias(char *alias, char *value)
 {
-	alias_def *al = &_aliases[_aliases_idx];
+	alias_def *al = &_aliases[_aliases_idx++];
 	strcpy(al->alias, alias);
 	strcpy(al->value, value);
-	_aliases_idx++;
 }
 
 char *find_alias(char alias[])
@@ -114,17 +110,14 @@ function_def *add_function(char *name)
 		if (strcmp(_functions[i].return_def.variable_name, name) == 0)
 			return &_functions[i];
 
-	fn = &_functions[_functions_idx];
+	fn = &_functions[_functions_idx++];
 	strcpy(fn->return_def.variable_name, name);
-	_functions_idx++;
 	return fn;
 }
 
 type_def *add_type()
 {
-	type_def *type = &_types[_types_idx];
-	_types_idx++;
-	return type;
+	return &_types[_types_idx++];
 }
 
 type_def *add_named_type(char *name)
@@ -136,10 +129,9 @@ type_def *add_named_type(char *name)
 
 void add_constant(char alias[], int value)
 {
-	constant_def *constant = &_constants[_constants_idx];
+	constant_def *constant = &_constants[_constants_idx++];
 	strcpy(constant->alias, alias);
 	constant->value = value;
-	_constants_idx++;
 }
 
 constant_def *find_constant(char alias[])

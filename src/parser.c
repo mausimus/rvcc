@@ -1,7 +1,8 @@
 /* rvcc C compiler - source->IL parser */
 
 void p_read_function_call(function_def *fn, int param_no, block_def *parent);
-void p_read_lvalue(lvalue_def *lvalue, variable_def *var, block_def *parent, int param_no, int evaluate);
+void p_read_lvalue(lvalue_def *lvalue, variable_def *var, block_def *parent, int param_no, int evaluate,
+		   il_op prefix_op);
 void p_read_expression(int param_no, block_def *parent);
 void p_read_code_block(function_def *function, block_def *parent);
 
@@ -85,7 +86,7 @@ int p_read_numeric_constant(char buffer[])
 			value = 0;
 			i = 2;
 			while (buffer[i] != 0) {
-				char c = buffer[i];
+				char c = buffer[i++];
 				value = value << 4;
 				if (c >= '0' && c <= '9')
 					value += c - '0';
@@ -93,12 +94,10 @@ int p_read_numeric_constant(char buffer[])
 					value += c - 'a' + 10;
 				else if (c >= 'A' && c <= 'F')
 					value += c - 'A' + 10;
-				i++;
 			}
 			return value;
 		}
-		value = value * 10 + buffer[i] - '0';
-		i++;
+		value = value * 10 + buffer[i++] - '0';
 	}
 	return value;
 }
@@ -147,8 +146,7 @@ int p_read_parameter_list_declaration(variable_def vds[])
 	int vn = 0;
 	l_expect(t_op_bracket);
 	while (l_peek(t_identifier, NULL) == 1) {
-		p_read_full_variable_declaration(&vds[vn]);
-		vn++;
+		p_read_full_variable_declaration(&vds[vn++]);
 		l_accept(t_comma);
 	}
 	if (l_accept(t_elipsis)) {
@@ -194,7 +192,7 @@ void p_read_numeric_param(int param_no, int isneg)
 	if (token[0] == '0' && (token[1] == 'x' || token[0] == 'X')) {
 		i = 2;
 		do {
-			c = token[i];
+			c = token[i++];
 			if (c >= '0' && c <= '9') {
 				c -= '0';
 			} else if (c >= 'a' && c <= 'f') {
@@ -208,13 +206,11 @@ void p_read_numeric_param(int param_no, int isneg)
 			}
 
 			value = (value * 16) + c;
-			i++;
 		} while (is_hex(token[i]));
 	} else {
 		do {
-			c = token[i] - '0';
+			c = token[i++] - '0';
 			value = (value * 10) + c;
-			i++;
 		} while (is_digit(token[i]));
 	}
 
@@ -269,7 +265,7 @@ void p_read_expression_operand(int param_no, block_def *parent)
 
 		l_peek(t_identifier, token);
 		var = find_variable(token, parent);
-		p_read_lvalue(&lvalue, var, parent, param_no, 0);
+		p_read_lvalue(&lvalue, var, parent, param_no, 0, op_generic);
 	} else if (l_peek(t_star, NULL)) {
 		/* dereference */
 		char token[MAX_VAR_LEN];
@@ -280,7 +276,7 @@ void p_read_expression_operand(int param_no, block_def *parent)
 		l_accept(t_op_bracket);
 		l_peek(t_identifier, token);
 		var = find_variable(token, parent);
-		p_read_lvalue(&lvalue, var, parent, param_no, 1);
+		p_read_lvalue(&lvalue, var, parent, param_no, 1, op_generic);
 		l_accept(t_cl_bracket);
 		ii = add_instr(op_read_addr);
 		ii->param_no = param_no;
@@ -311,10 +307,16 @@ void p_read_expression_operand(int param_no, block_def *parent)
 		l_expect(t_cl_bracket);
 	} else {
 		/* function call, constant or variable - read token and determine */
+		il_op prefix_op = op_generic;
 		char token[MAX_ID_LEN];
 		function_def *fn;
 		variable_def *var;
 		constant_def *con;
+
+		if (l_accept(t_plusplus))
+			prefix_op = op_add;
+		else if (l_accept(t_minusminus))
+			prefix_op = op_sub;
 
 		l_peek(t_identifier, token);
 
@@ -332,7 +334,7 @@ void p_read_expression_operand(int param_no, block_def *parent)
 		} else if (var != NULL) {
 			/* evalue lvalue expression */
 			lvalue_def lvalue;
-			p_read_lvalue(&lvalue, var, parent, param_no, 1);
+			p_read_lvalue(&lvalue, var, parent, param_no, 1, prefix_op);
 		} else if (fn != NULL) {
 			il_instr *ii;
 			int pn;
@@ -484,8 +486,7 @@ void p_read_expression(int param_no, block_def *parent)
 		}
 
 		/* push operator on stack */
-		op_stack[op_stack_idx] = op;
-		op_stack_idx++;
+		op_stack[op_stack_idx++] = op;
 
 		/* push value on stack */
 		p_read_expression_operand(param_no, parent);
@@ -532,9 +533,8 @@ void p_read_function_parameters(block_def *parent)
 	int param_num = 0;
 	l_expect(t_op_bracket);
 	while (!l_accept(t_cl_bracket)) {
-		p_read_expression(param_num, parent);
+		p_read_expression(param_num++, parent);
 		l_accept(t_comma);
-		param_num++;
 	}
 }
 
@@ -552,7 +552,8 @@ void p_read_function_call(function_def *fn, int param_no, block_def *parent)
 
 /* returns address an expression points to, or evaluates its value */
 /* x =; x[<expr>] =; x[expr].field =; x[expr]->field =; x + ... */
-void p_read_lvalue(lvalue_def *lvalue, variable_def *var, block_def *parent, int param_no, int evaluate)
+void p_read_lvalue(lvalue_def *lvalue, variable_def *var, block_def *parent, int param_no, int evaluate,
+		   il_op prefix_op)
 {
 	il_instr *ii;
 	int is_reference = 1;
@@ -682,10 +683,68 @@ void p_read_lvalue(lvalue_def *lvalue, variable_def *var, block_def *parent, int
 		} else {
 			/* we should NOT dereference if var is of type array and there was no offset */
 			if (is_reference) {
-				ii = add_instr(op_read_addr);
-				ii->param_no = param_no;
-				ii->int_param1 = param_no;
-				ii->int_param2 = lvalue->size;
+				if (prefix_op != op_generic) {
+					/* read into p+1 */
+					ii = add_instr(op_read_addr);
+					ii->param_no = param_no + 1;
+					ii->int_param1 = param_no;
+					ii->int_param2 = lvalue->size;
+
+					/* load 1 */
+					ii = add_instr(op_load_numeric_constant);
+					ii->param_no = param_no + 2;
+					ii->int_param1 = 1;
+
+					/* add/sub */
+					ii = add_instr(prefix_op);
+					ii->param_no = param_no + 1;
+					ii->int_param1 = param_no + 2;
+
+					/* store */
+					ii = add_instr(op_write_addr);
+					ii->param_no = param_no + 1;
+					ii->int_param1 = param_no;
+					ii->int_param2 = lvalue->size;
+				}
+				if (l_peek(t_plusplus, NULL) || l_peek(t_minusminus, NULL)) {
+					/* load value into param_no + 1 */
+					ii = add_instr(op_read_addr);
+					ii->param_no = param_no + 1;
+					ii->int_param1 = param_no;
+					ii->int_param2 = lvalue->size;
+
+					/* push the value */
+					ii = add_instr(op_push);
+					ii->param_no = param_no + 1;
+
+					/* load 1 */
+					ii = add_instr(op_load_numeric_constant);
+					ii->param_no = param_no + 2;
+					ii->int_param1 = 1;
+
+					/* add 1 */
+					if (l_accept(t_plusplus))
+						ii = add_instr(op_add);
+					else
+						ii = add_instr(op_sub);
+					ii->param_no = param_no + 1;
+					ii->int_param1 = param_no + 2;
+
+					/* store */
+					ii = add_instr(op_write_addr);
+					ii->param_no = param_no + 1;
+					ii->int_param1 = param_no;
+					ii->int_param2 = lvalue->size;
+
+					/* pop original  value */
+					ii = add_instr(op_pop);
+					ii->param_no = param_no;
+				} else {
+					ii = add_instr(op_read_addr);
+					ii->param_no = param_no;
+					ii->int_param1 = param_no;
+					ii->int_param2 = lvalue->size;
+				}
 			}
 		}
 	}
@@ -704,7 +763,7 @@ int p_read_body_assignment(char *token, block_def *parent)
 		int size = 0;
 
 		/* a0 has memory address we want to set */
-		p_read_lvalue(&lvalue, var, parent, 0, 0);
+		p_read_lvalue(&lvalue, var, parent, 0, 0, op_generic);
 		size = lvalue.size;
 
 		if (l_accept(t_plusplus)) {
@@ -883,8 +942,7 @@ void p_read_body_statement(block_def *parent)
 		/* create exit jump for breaks */
 		switch_exit = add_instr(op_jump);
 		switch_exit->string_param1 = "switch_exit";
-		_p_break_exit_il_idxs[_p_break_level] = switch_exit->il_index;
-		_p_break_level++;
+		_p_break_exit_il_idxs[_p_break_level++] = switch_exit->il_index;
 
 		l_expect(t_op_curly);
 		while (l_peek(t_default, NULL) || l_peek(t_case, NULL)) {
@@ -907,8 +965,7 @@ void p_read_body_statement(block_def *parent)
 				ii = add_instr(op_label);
 				ii->string_param1 = "case";
 				case_values[case_idx] = case_val;
-				case_il_idxs[case_idx] = ii->il_index;
-				case_idx++;
+				case_il_idxs[case_idx++] = ii->il_index;
 			}
 			l_expect(t_colon);
 
@@ -1067,9 +1124,8 @@ void p_read_body_statement(block_def *parent)
 	/* is it a variable declaration? */
 	type = find_type(token);
 	if (type != NULL) {
-		var = &parent->locals[parent->next_local];
+		var = &parent->locals[parent->next_local++];
 		p_read_full_variable_declaration(var);
-		parent->next_local++;
 		if (l_accept(t_assign)) {
 			p_read_expression(1, parent); /* get expression value into a1 */
 			/* assign a0 to our new variable */
@@ -1089,9 +1145,8 @@ void p_read_body_statement(block_def *parent)
 			/* multiple (partial) declarations */
 			variable_def *nv;
 
-			nv = &parent->locals[parent->next_local];
+			nv = &parent->locals[parent->next_local++];
 			p_read_partial_variable_declaration(nv, var); /* partial */
-			parent->next_local++;
 			if (l_accept(t_assign)) {
 				p_read_expression(1, parent); /* get expression value into a1 */
 				/* assign a0 to our new variable */
@@ -1189,8 +1244,7 @@ void p_read_global_declaration(block_def *block)
 	}
 
 	/* it's a variable */
-	memcpy(&block->locals[block->next_local], _temp_variable, sizeof(variable_def));
-	block->next_local++;
+	memcpy(&block->locals[block->next_local++], _temp_variable, sizeof(variable_def));
 
 	if (l_accept(t_assign))
 		/* we don't support global initialisation */
@@ -1240,8 +1294,7 @@ void p_read_global_statement()
 					l_ident(t_numeric, value);
 					val = p_read_numeric_constant(value);
 				}
-				add_constant(token, val);
-				val++;
+				add_constant(token, val++);
 			} while (l_accept(t_comma));
 			l_expect(t_cl_curly);
 			l_ident(t_identifier, token);
@@ -1258,11 +1311,10 @@ void p_read_global_statement()
 			}
 			l_expect(t_op_curly);
 			do {
-				variable_def *v = &type->fields[i];
+				variable_def *v = &type->fields[i++];
 				p_read_full_variable_declaration(v);
 				v->offset = size;
 				size += size_variable(v);
-				i++;
 				l_expect(t_semicolon);
 			} while (!l_accept(t_cl_curly));
 
