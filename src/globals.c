@@ -44,6 +44,7 @@ char *_e_footer;
 int _e_footer_idx;
 int _e_header_len;
 int _e_code_start;
+int _e_symbol_idx;
 
 type_def *find_type(char *type_name)
 {
@@ -221,7 +222,7 @@ int size_variable(variable_def *var)
 
 void g_initialize()
 {
-	_e_header_len = 0x74; /* ELF fixed: 0x34 + 2 * 0x20 */
+	_e_header_len = 0x54; /* ELF fixed: 0x34 + 1 * 0x20 */
 
 	_e_header_idx = 0;
 	_e_footer_idx = 0;
@@ -237,6 +238,7 @@ void g_initialize()
 	_types_idx = 0;
 	_functions_idx = 0;
 	_p_break_level = 0;
+	_e_symbol_idx = 0;
 
 	_e_code_start = ELF_START + _e_header_len;
 

@@ -513,7 +513,7 @@ void c_generate(arch_t arch)
 			printf("  -x%d", dest_reg);
 			break;
 		case op_label:
-			if (ii->string_param1 != 0)
+			if (ii->string_param1 != NULL)
 				/* TODO: lazy eval */
 				if (strlen(ii->string_param1) > 0)
 					e_add_symbol(ii->string_param1, strlen(ii->string_param1), code_start + pc);

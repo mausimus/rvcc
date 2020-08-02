@@ -941,14 +941,12 @@ void p_read_body_statement(block_def *parent)
 
 		/* create exit jump for breaks */
 		switch_exit = add_instr(op_jump);
-		switch_exit->string_param1 = "switch_exit";
 		_p_break_exit_il_idxs[_p_break_level++] = switch_exit->il_index;
 
 		l_expect(t_op_curly);
 		while (l_peek(t_default, NULL) || l_peek(t_case, NULL)) {
 			if (l_accept(t_default)) {
 				ii = add_instr(op_label);
-				ii->string_param1 = "default";
 				default_il_idx = ii->il_index;
 			} else {
 				int case_val;
@@ -963,7 +961,6 @@ void p_read_body_statement(block_def *parent)
 					l_expect(t_identifier); /* already read it */
 				}
 				ii = add_instr(op_label);
-				ii->string_param1 = "case";
 				case_values[case_idx] = case_val;
 				case_il_idxs[case_idx++] = ii->il_index;
 			}
@@ -978,7 +975,6 @@ void p_read_body_statement(block_def *parent)
 		l_expect(t_cl_curly);
 
 		ii = add_instr(op_label);
-		ii->string_param1 = "switch_check";
 		jump_to_check->int_param1 = ii->il_index;
 
 		/* perform checks against a1 */
@@ -1003,7 +999,6 @@ void p_read_body_statement(block_def *parent)
 
 		/* exit where breaks should exit to */
 		ii = add_instr(op_label);
-		ii->string_param1 = "switch_end";
 		switch_exit->int_param1 = ii->il_index;
 
 		return;

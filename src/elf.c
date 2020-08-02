@@ -91,7 +91,7 @@ void e_generate_header(arch_t arch)
 	/* flags */
 	switch (arch) {
 	case a_arm:
-		e_write_header_int(0x5000200);
+		e_write_header_int(0x5000400);
 		break;
 	case a_riscv:
 		e_write_header_int(0);
@@ -101,7 +101,7 @@ void e_generate_header(arch_t arch)
 	e_write_header_byte(0);
 	e_write_header_byte(0x20); /* program header size */
 	e_write_header_byte(0);
-	e_write_header_byte(2); /* number of prog headers */
+	e_write_header_byte(1); /* number of prog headers */
 	e_write_header_byte(0);
 	e_write_header_byte(0x28); /* section header size */
 	e_write_header_byte(0);
@@ -110,24 +110,14 @@ void e_generate_header(arch_t arch)
 	e_write_header_byte(5); /* section index with names */
 	e_write_header_byte(0);
 
-	/* program header - code */
+	/* program header - code and data combined */
 	e_write_header_int(1); /* PT_LOAD */
 	e_write_header_int(_e_header_len); /* offset */
 	e_write_header_int(ELF_START + _e_header_len); /* virtual address */
 	e_write_header_int(ELF_START + _e_header_len); /* physical address */
-	e_write_header_int(_e_code_idx); /* size in file */
-	e_write_header_int(_e_code_idx); /* size in memory */
+	e_write_header_int(_e_code_idx + _e_data_idx); /* size in file */
+	e_write_header_int(_e_code_idx + _e_data_idx); /* size in memory */
 	e_write_header_int(7); /* flags */
-	e_write_header_int(4); /* alignment */
-
-	/* program header - data */
-	e_write_header_int(1); /* PT_LOAD */
-	e_write_header_int(_e_header_len + _e_code_idx); /* offset */
-	e_write_header_int(_e_code_start + _e_code_idx); /* virtual address */
-	e_write_header_int(_e_code_start + _e_code_idx); /* physical address */
-	e_write_header_int(_e_data_idx); /* size in file */
-	e_write_header_int(_e_data_idx); /* size in memory */
-	e_write_header_int(6); /* flags */
 	e_write_header_int(4); /* alignment */
 }
 
@@ -201,7 +191,7 @@ void e_generate_footer()
 	e_write_footer_int(_e_header_len + _e_code_idx + _e_data_idx);
 	e_write_footer_int(_e_symtab_idx); /* size */
 	e_write_footer_int(4);
-	e_write_footer_int(8);
+	e_write_footer_int(_e_symbol_idx);
 	e_write_footer_int(4);
 	e_write_footer_int(16);
 
@@ -258,6 +248,7 @@ void e_add_symbol(char *symbol, int len, int pc)
 	strncpy(_e_strtab + _e_strtab_idx, symbol, len);
 	_e_strtab_idx += len;
 	_e_strtab[_e_strtab_idx++] = 0;
+	_e_symbol_idx++;
 }
 
 void e_output(char *outfile)
