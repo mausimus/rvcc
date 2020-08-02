@@ -1,8 +1,5 @@
 /* rvcc C compiler - source code loader */
 
-#include <stdio.h>
-#include <string.h>
-
 void s_write_string(char *src)
 {
 	int i = 0;
@@ -29,9 +26,8 @@ void s_load(char *file)
 		if (strncmp(buffer, "#include ", 9) == 0 && buffer[9] == '"') {
 			char path[MAX_LINE_LEN];
 			int c = strlen(file) - 1;
-			while (c > 0 && file[c] != '/') {
+			while (c > 0 && file[c] != '/')
 				c--;
-			}
 			if (c != 0) {
 				/* prepend directory name */
 				strncpy(path, file, c + 1);

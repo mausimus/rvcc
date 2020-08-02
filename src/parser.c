@@ -14,9 +14,8 @@ int p_write_symbol(char *data, int len)
 
 int p_get_size(variable_def *var, type_def *type)
 {
-	if (var->is_pointer) {
+	if (var->is_pointer)
 		return PTR_SIZE;
-	}
 	return type->size;
 }
 
@@ -43,10 +42,16 @@ void p_initialize(arch_t arch)
 	e_add_symbol("", 0, 0); /* undef symbol */
 
 	/* architecutre define */
-	if (arch == a_arm)
+	switch (arch) {
+	case a_arm:
 		add_alias("__ARM", "1");
-	else
+		break;
+	case a_riscv:
 		add_alias("__RISCV", "1");
+		break;
+	default:
+		error("Unsupported architecture");
+	}
 
 	/* binary entry point: read params, call main, exit */
 	ii = add_instr(op_label);
@@ -82,13 +87,12 @@ int p_read_numeric_constant(char buffer[])
 			while (buffer[i] != 0) {
 				char c = buffer[i];
 				value = value << 4;
-				if (c >= '0' && c <= '9') {
+				if (c >= '0' && c <= '9')
 					value += c - '0';
-				} else if (c >= 'a' && c <= 'f') {
+				else if (c >= 'a' && c <= 'f')
 					value += c - 'a' + 10;
-				} else if (c >= 'A' && c <= 'F') {
+				else if (c >= 'A' && c <= 'F')
 					value += c - 'A' + 10;
-				}
 				i++;
 			}
 			return value;
@@ -101,11 +105,10 @@ int p_read_numeric_constant(char buffer[])
 
 void p_read_inner_variable_declaration(variable_def *vd)
 {
-	if (l_accept(t_star)) {
+	if (l_accept(t_star))
 		vd->is_pointer = 1;
-	} else {
+	else
 		vd->is_pointer = 0;
-	}
 	l_ident(t_identifier, vd->variable_name);
 	if (l_accept(t_op_square)) {
 		char buffer[10];
@@ -142,7 +145,6 @@ void p_read_partial_variable_declaration(variable_def *vd, variable_def *templat
 int p_read_parameter_list_declaration(variable_def vds[])
 {
 	int vn = 0;
-
 	l_expect(t_op_bracket);
 	while (l_peek(t_identifier, NULL) == 1) {
 		p_read_full_variable_declaration(&vds[vn]);
@@ -158,7 +160,6 @@ int p_read_parameter_list_declaration(variable_def vds[])
 		}
 	}
 	l_expect(t_cl_bracket);
-
 	return vn;
 }
 
@@ -378,37 +379,36 @@ int p_get_operator_priority(il_op op)
 il_op p_get_operator()
 {
 	il_op op = op_generic;
-	if (l_accept(t_plus)) {
+	if (l_accept(t_plus))
 		op = op_add;
-	} else if (l_accept(t_minus)) {
+	else if (l_accept(t_minus))
 		op = op_sub;
-	} else if (l_accept(t_star)) {
+	else if (l_accept(t_star))
 		op = op_mul;
-	} else if (l_accept(t_lshift)) {
+	else if (l_accept(t_lshift))
 		op = op_bit_lshift;
-	} else if (l_accept(t_rshift)) {
+	else if (l_accept(t_rshift))
 		op = op_bit_rshift;
-	} else if (l_accept(t_log_and)) {
+	else if (l_accept(t_log_and))
 		op = op_log_and;
-	} else if (l_accept(t_log_or)) {
+	else if (l_accept(t_log_or))
 		op = op_log_or;
-	} else if (l_accept(t_eq)) {
+	else if (l_accept(t_eq))
 		op = op_equals;
-	} else if (l_accept(t_noteq)) {
+	else if (l_accept(t_noteq))
 		op = op_not_equals;
-	} else if (l_accept(t_lt)) {
+	else if (l_accept(t_lt))
 		op = op_less_than;
-	} else if (l_accept(t_le)) {
+	else if (l_accept(t_le))
 		op = op_less_eq_than;
-	} else if (l_accept(t_gt)) {
+	else if (l_accept(t_gt))
 		op = op_greater_than;
-	} else if (l_accept(t_ge)) {
+	else if (l_accept(t_ge))
 		op = op_greater_eq_than;
-	} else if (l_accept(t_ampersand)) {
+	else if (l_accept(t_ampersand))
 		op = op_bit_and;
-	} else if (l_accept(t_bit_or)) {
+	else if (l_accept(t_bit_or))
 		op = op_bit_or;
-	}
 	return op;
 }
 
@@ -424,11 +424,9 @@ void p_read_expression(int param_no, block_def *parent)
 
 	/* check for any operator following */
 	op = p_get_operator();
-
-	if (op == op_generic) {
+	if (op == op_generic)
 		/* no continuation */
 		return;
-	}
 
 	p_read_expression_operand(param_no + 1, parent);
 	next_op = p_get_operator();
@@ -444,10 +442,8 @@ void p_read_expression(int param_no, block_def *parent)
 	/* more than two operands - use stack */
 	il = add_instr(op_push);
 	il->param_no = param_no;
-
 	il = add_instr(op_push);
 	il->param_no = param_no + 1;
-
 	op_stack[0] = op;
 	op_stack_idx++;
 	op = next_op;
@@ -534,9 +530,7 @@ void p_read_expression(int param_no, block_def *parent)
 void p_read_function_parameters(block_def *parent)
 {
 	int param_num = 0;
-
 	l_expect(t_op_bracket);
-
 	while (!l_accept(t_cl_bracket)) {
 		p_read_expression(param_num, parent);
 		l_accept(t_comma);
@@ -550,9 +544,7 @@ void p_read_function_call(function_def *fn, int param_no, block_def *parent)
 
 	/* we already have function name in fn */
 	l_expect(t_identifier);
-
 	p_read_function_parameters(parent);
-
 	ii = add_instr(op_function_call);
 	ii->string_param1 = fn->return_def.variable_name;
 	ii->param_no = param_no; /* return value here */
@@ -587,9 +579,8 @@ void p_read_lvalue(lvalue_def *lvalue, variable_def *var, block_def *parent, int
 			}
 
 			/* offset, so var must be either a pointer or an array of some type */
-			if (var->is_pointer == 0 && var->array_size == 0) {
+			if (var->is_pointer == 0 && var->array_size == 0)
 				error("Cannot apply square operator to non-pointer");
-			}
 
 			/* if var is an array, the memory location points to its start,
 				but if var is a pointer, we need to dereference */
@@ -704,10 +695,8 @@ int p_read_body_assignment(char *token, block_def *parent)
 {
 	il_instr *ii;
 	variable_def *var = find_local_variable(token, parent);
-
-	if (var == NULL) {
+	if (var == NULL)
 		var = find_global_variable(token);
-	}
 	if (var != NULL) {
 		int one = 0;
 		il_op op = op_generic;
@@ -740,9 +729,8 @@ int p_read_body_assignment(char *token, block_def *parent)
 			int increment_size = 1;
 
 			/* if we have a pointer, we shift it by element size */
-			if (lvalue.is_pointer) {
+			if (lvalue.is_pointer)
 				increment_size = lvalue.type->size;
-			}
 
 			/* get current value into a1 */
 			ii = add_instr(op_read_addr);
@@ -908,18 +896,24 @@ void p_read_body_statement(block_def *parent)
 				int case_val;
 
 				l_accept(t_case);
-				case_val = p_read_numeric_constant(_l_token_string);
+				if (l_peek(t_numeric, NULL)) {
+					case_val = p_read_numeric_constant(_l_token_string);
+					l_expect(t_numeric); /* already read it */
+				} else {
+					constant_def *cd = find_constant(_l_token_string);
+					case_val = cd->value;
+					l_expect(t_identifier); /* already read it */
+				}
 				ii = add_instr(op_label);
 				ii->string_param1 = "case";
 				case_values[case_idx] = case_val;
 				case_il_idxs[case_idx] = ii->il_index;
 				case_idx++;
-				l_expect(t_numeric); /* already read it */
 			}
 			l_expect(t_colon);
 
 			/* body is optional, can be another case */
-			while (!l_peek(t_case, NULL) && !l_peek(t_cl_curly, NULL) && !l_peek(t_default, NULL)) {
+			while ((!l_peek(t_case, NULL)) && (!l_peek(t_cl_curly, NULL)) && (!l_peek(t_default, NULL))) {
 				p_read_body_statement(parent);
 				/* should end with a break which will generate jump out */
 			}
@@ -1144,9 +1138,10 @@ void p_read_code_block(function_def *function, block_def *parent)
 	ii = add_instr(op_block_start);
 	ii->int_param1 = bd->bd_index;
 	l_expect(t_op_curly);
-	while (!l_accept(t_cl_curly)) {
+
+	while (!l_accept(t_cl_curly))
 		p_read_body_statement(bd);
-	}
+
 	ii = add_instr(op_block_end);
 	ii->int_param1 = bd->bd_index;
 }
@@ -1197,15 +1192,14 @@ void p_read_global_declaration(block_def *block)
 	memcpy(&block->locals[block->next_local], _temp_variable, sizeof(variable_def));
 	block->next_local++;
 
-	if (l_accept(t_assign)) {
+	if (l_accept(t_assign))
 		/* we don't support global initialisation */
 		error("Global initialization not supported");
-	} else if (l_accept(t_comma)) {
+	else if (l_accept(t_comma))
 		/* TODO: continuation */
 		error("Global continuation not supported");
-	} else if (l_accept(t_semicolon)) {
+	else if (l_accept(t_semicolon))
 		return;
-	}
 	error("Syntax error in global declaration");
 }
 
@@ -1218,8 +1212,8 @@ void p_read_global_statement()
 
 	if (l_peek(t_include, token)) {
 		if (strcmp(_l_token_string, "<stdio.h>") == 0) {
-			/* TODO */
-		} /* otherwise ignore? */
+			/* ignore, we inclue rvclib by default */
+		}
 		l_expect(t_include);
 	} else if (l_accept(t_define)) {
 		char alias[MAX_VAR_LEN];

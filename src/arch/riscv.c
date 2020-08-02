@@ -91,9 +91,9 @@ int r_extract_bits(int imm, int i_start, int i_end, int d_start, int d_end)
 {
 	int v;
 
-	if (d_end - d_start != i_end - i_start || i_start > i_end || d_start > d_end) {
+	if (d_end - d_start != i_end - i_start || i_start > i_end || d_start > d_end)
 		error("Invalid bit copy");
-	}
+
 	v = imm >> i_start;
 	v = v & ((2 << (i_end - i_start)) - 1);
 	v = v << d_start;
@@ -102,20 +102,18 @@ int r_extract_bits(int imm, int i_start, int i_end, int d_start, int d_end)
 
 int r_hi(int val)
 {
-	if ((val & (1 << 11)) != 0) {
+	if ((val & (1 << 11)) != 0)
 		return val + 4096;
-	} else {
+	else
 		return val;
-	}
 }
 
 int r_lo(int val)
 {
-	if ((val & (1 << 11)) != 0) {
+	if ((val & (1 << 11)) != 0)
 		return (val & 0xFFF) - 4096;
-	} else {
+	else
 		return val & 0xFFF;
-	}
 }
 
 int r_encode_R(ri_op op, r_reg rd, r_reg rs1, r_reg rs2)
@@ -125,9 +123,9 @@ int r_encode_R(ri_op op, r_reg rd, r_reg rs1, r_reg rs2)
 
 int r_encode_I(ri_op op, r_reg rd, r_reg rs1, int imm)
 {
-	if (imm > 2047 || imm < -2048) {
+	if (imm > 2047 || imm < -2048)
 		error("Offset too large");
-	}
+
 	if (imm < 0) {
 		imm += 4096;
 		imm &= (1 << 13) - 1;
@@ -137,9 +135,9 @@ int r_encode_I(ri_op op, r_reg rd, r_reg rs1, int imm)
 
 int r_encode_S(ri_op op, r_reg rs1, r_reg rs2, int imm)
 {
-	if (imm > 2047 || imm < -2048) {
+	if (imm > 2047 || imm < -2048)
 		error("Offset too large");
-	}
+
 	if (imm < 0) {
 		imm += 4096;
 		imm &= (1 << 13) - 1;
@@ -152,12 +150,12 @@ int r_encode_B(ri_op op, r_reg rs1, r_reg rs2, int imm)
 	int sign = 0;
 
 	/* 13 signed bits, with bit zero ignored */
-	if (imm > 4095 || imm < -4096) {
+	if (imm > 4095 || imm < -4096)
 		error("Offset too large");
-	}
-	if (imm < 0) {
+
+	if (imm < 0)
 		sign = 1;
-	}
+
 	return op + (rs1 << 15) + (rs2 << 20) + r_extract_bits(imm, 11, 11, 7, 7) + r_extract_bits(imm, 1, 4, 8, 11) +
 	       r_extract_bits(imm, 5, 10, 25, 30) + (sign << 31);
 }

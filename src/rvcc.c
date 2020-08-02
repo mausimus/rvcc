@@ -24,22 +24,21 @@ int main(int argc, char *argv[])
 	printf("rvcc C compiler\n");
 
 	while (i < argc) {
-		if (strcmp(argv[i], "-noclib") == 0) {
+		if (strcmp(argv[i], "-noclib") == 0)
 			clib = 0;
-		} else if (strcmp(argv[i], "-march=arm") == 0) {
+		else if (strcmp(argv[i], "-march=arm") == 0)
 			arch = a_arm;
-		} else if (strncmp(argv[i], "-L", 2) == 0) {
+		else if (strncmp(argv[i], "-L", 2) == 0)
 			libpath = argv[i] + 2;
-		} else if (strcmp(argv[i], "-o") == 0) {
+		else if (strcmp(argv[i], "-o") == 0)
 			if (i < argc + 1) {
 				outfile = argv[i + 1];
 				i++;
 			} else {
 				abort();
 			}
-		} else {
+		else
 			infile = argv[i];
-		}
 		i++;
 	}
 
@@ -55,11 +54,10 @@ int main(int argc, char *argv[])
 	/* include clib */
 	if (clib) {
 		char lib[MAX_TOKEN_LEN];
-		if (libpath == NULL) {
+		if (libpath == NULL)
 			libpath = "lib";
-		}
 		strcpy(lib, libpath);
-		strcpy(lib + strlen(libpath), "/clib.c");
+		strcpy(lib + strlen(libpath), "/rvclib.c");
 		s_load(lib);
 	}
 

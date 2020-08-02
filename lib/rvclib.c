@@ -144,12 +144,10 @@ void __render10(char *pb, int val)
 
 	if (neg == 1) {
 		int c = 0;
-		while (pb[c] == '0') {
+		while (pb[c] == '0')
 			c++;
-		}
-		if (c > 0) {
+		if (c > 0)
 			pb[c - 1] = '-';
-		}
 	}
 }
 
@@ -158,13 +156,12 @@ void __render16(char *pb, int val)
 	int c = 9;
 	while (c > 0) {
 		int v = val & 0xf;
-		if (v < 10) {
+		if (v < 10)
 			pb[c] = '0' + v;
-		} else if (v < 16) {
+		else if (v < 16)
 			pb[c] = 'a' + v - 10;
-		} else {
+		else
 			abort();
-		}
 		val = val >> 4;
 		c--;
 	}
@@ -180,11 +177,10 @@ int __format(char *buffer, int val, int width, int zeropad, int base, int hexpre
 		buffer[0] = '0';
 		buffer[1] = 'x';
 		bi = 2;
-		if (width > 2) {
+		if (width > 2)
 			width -= 2;
-		} else {
+		else
 			width = 0;
-		}
 	}
 
 	/* set to zeroes */
@@ -193,21 +189,19 @@ int __format(char *buffer, int val, int width, int zeropad, int base, int hexpre
 		pbi++;
 	}
 
-	if (base == 10) {
+	if (base == 10)
 		__render10(pb, val);
-	} else if (base == 16) {
+	else if (base == 16)
 		__render16(pb, val);
-	} else {
+	else
 		abort();
-	}
 
 	while (width > 10) {
 		/* need to add extra padding */
-		if (zeropad == 1) {
+		if (zeropad == 1)
 			buffer[bi] = '0';
-		} else {
+		else
 			buffer[bi] = ' ';
-		}
 		bi++;
 		width--;
 	}
@@ -219,9 +213,8 @@ int __format(char *buffer, int val, int width, int zeropad, int base, int hexpre
 
 		/* output from first digit */
 		while (c < 10) {
-			if (pb[c] != '0') {
+			if (pb[c] != '0')
 				started = 1;
-			}
 			if (started) {
 				buffer[bi] = pb[c];
 				bi++;
@@ -238,16 +231,14 @@ int __format(char *buffer, int val, int width, int zeropad, int base, int hexpre
 		int c = 10 - width;
 		int started = 0;
 		while (c < 10) {
-			if (pb[c] != '0') {
+			if (pb[c] != '0')
 				started = 1;
-			}
-			if (started) {
+			if (started)
 				buffer[bi] = pb[c];
-			} else if (zeropad == 1) {
+			else if (zeropad == 1)
 				buffer[bi] = '0';
-			} else {
+			else
 				buffer[bi] = ' ';
-			}
 			bi++;
 			c++;
 		}
@@ -335,11 +326,10 @@ void abort()
 
 FILE *fopen(char *filename, char *mode)
 {
-	if (strcmp(mode, "wb") == 0) {
+	if (strcmp(mode, "wb") == 0)
 		return __syscall(__syscall_open, filename, 65, 0x1c0);
-	} else if (strcmp(mode, "rb") == 0) {
+	else if (strcmp(mode, "rb") == 0)
 		return __syscall(__syscall_open, filename, 0, 0);
-	}
 	abort();
 }
 
@@ -353,9 +343,8 @@ int fgetc(FILE *stream)
 {
 	char buf;
 	int r = __syscall(__syscall_read, stream, &buf, 1);
-	if (r <= 0) {
+	if (r <= 0)
 		return -1;
-	}
 	return buf;
 }
 
@@ -366,14 +355,13 @@ char *fgets(char *str, int n, FILE *stream)
 	do {
 		c = fgetc(stream);
 		if (c == -1 || c == 255) {
-			if (i == 0) {
+			if (i == 0)
 				/* EOF on first char */
 				return NULL;
-			} else {
+			else
 				/* EOF in the middle */
 				str[i] = 0;
-				return str;
-			}
+			return str;
 		}
 		str[i] = c;
 		i++;

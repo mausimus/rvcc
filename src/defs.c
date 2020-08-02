@@ -1,8 +1,5 @@
 /* rvcc C compiler - definitions */
 
-#include <stdio.h>
-#include <stdlib.h>
-
 /* code limits */
 #define MAX_TOKEN_LEN 256
 #define MAX_ID_LEN 64

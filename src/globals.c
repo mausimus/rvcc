@@ -48,11 +48,9 @@ int _e_code_start;
 type_def *find_type(char *type_name)
 {
 	int i;
-	for (i = 0; i < _types_idx; i++) {
-		if (strcmp(_types[i].type_name, type_name) == 0) {
+	for (i = 0; i < _types_idx; i++)
+		if (strcmp(_types[i].type_name, type_name) == 0)
 			return &_types[i];
-		}
-	}
 	return NULL;
 }
 
@@ -100,11 +98,9 @@ void add_alias(char *alias, char *value)
 char *find_alias(char alias[])
 {
 	int i;
-	for (i = 0; i < _aliases_idx; i++) {
-		if (strcmp(alias, _aliases[i].alias) == 0) {
+	for (i = 0; i < _aliases_idx; i++)
+		if (strcmp(alias, _aliases[i].alias) == 0)
 			return _aliases[i].value;
-		}
-	}
 	return NULL;
 }
 
@@ -114,11 +110,9 @@ function_def *add_function(char *name)
 	int i;
 
 	/* return existing if found */
-	for (i = 0; i < _functions_idx; i++) {
-		if (strcmp(_functions[i].return_def.variable_name, name) == 0) {
+	for (i = 0; i < _functions_idx; i++)
+		if (strcmp(_functions[i].return_def.variable_name, name) == 0)
 			return &_functions[i];
-		}
-	}
 
 	fn = &_functions[_functions_idx];
 	strcpy(fn->return_def.variable_name, name);
@@ -151,33 +145,27 @@ void add_constant(char alias[], int value)
 constant_def *find_constant(char alias[])
 {
 	int i;
-	for (i = 0; i < _constants_idx; i++) {
-		if (strcmp(_constants[i].alias, alias) == 0) {
+	for (i = 0; i < _constants_idx; i++)
+		if (strcmp(_constants[i].alias, alias) == 0)
 			return &_constants[i];
-		}
-	}
 	return NULL;
 }
 
 function_def *find_function(char function_name[])
 {
 	int i;
-	for (i = 0; i < _functions_idx; i++) {
-		if (strcmp(_functions[i].return_def.variable_name, function_name) == 0) {
+	for (i = 0; i < _functions_idx; i++)
+		if (strcmp(_functions[i].return_def.variable_name, function_name) == 0)
 			return &_functions[i];
-		}
-	}
 	return NULL;
 }
 
 variable_def *find_member(char token[], type_def *type)
 {
 	int i;
-	for (i = 0; i < type->num_fields; i++) {
-		if (strcmp(type->fields[i].variable_name, token) == 0) {
+	for (i = 0; i < type->num_fields; i++)
+		if (strcmp(type->fields[i].variable_name, token) == 0)
 			return &type->fields[i];
-		}
-	}
 	return NULL;
 }
 
@@ -187,20 +175,16 @@ variable_def *find_local_variable(char *token, block_def *block)
 	function_def *fn = block->function;
 
 	while (block != NULL) {
-		for (i = 0; i < block->next_local; i++) {
-			if (strcmp(block->locals[i].variable_name, token) == 0) {
+		for (i = 0; i < block->next_local; i++)
+			if (strcmp(block->locals[i].variable_name, token) == 0)
 				return &block->locals[i];
-			}
-		}
 		block = block->parent;
 	}
 
 	if (fn != NULL) {
-		for (i = 0; i < fn->num_params; i++) {
-			if (strcmp(fn->param_defs[i].variable_name, token) == 0) {
+		for (i = 0; i < fn->num_params; i++)
+			if (strcmp(fn->param_defs[i].variable_name, token) == 0)
 				return &fn->param_defs[i];
-			}
-		}
 	}
 	return NULL;
 }
@@ -210,20 +194,17 @@ variable_def *find_global_variable(char *token)
 	int i;
 	block_def *block = &_blocks[0];
 
-	for (i = 0; i < block->next_local; i++) {
-		if (strcmp(block->locals[i].variable_name, token) == 0) {
+	for (i = 0; i < block->next_local; i++)
+		if (strcmp(block->locals[i].variable_name, token) == 0)
 			return &block->locals[i];
-		}
-	}
 	return NULL;
 }
 
 variable_def *find_variable(char *token, block_def *parent)
 {
 	variable_def *var = find_local_variable(token, parent);
-	if (var == NULL) {
+	if (var == NULL)
 		var = find_global_variable(token);
-	}
 	return var;
 }
 
@@ -238,12 +219,10 @@ int size_variable(variable_def *var)
 		td = find_type(var->type_name);
 		bs = td->size;
 		if (var->array_size > 0) {
-			for (j = 0; j < var->array_size; j++) {
+			for (j = 0; j < var->array_size; j++)
 				s += bs;
-			}
-		} else {
+		} else
 			s += bs;
-		}
 	}
 	return s;
 }

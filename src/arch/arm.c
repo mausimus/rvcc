@@ -59,13 +59,34 @@ typedef enum {
 	a_pc = 15
 } a_reg;
 
+ar_cond a_get_cond(il_op op)
+{
+	switch (op) {
+	case op_equals:
+		return ac_eq;
+	case op_not_equals:
+		return ac_ne;
+	case op_less_than:
+		return ac_lt;
+	case op_greater_eq_than:
+		return ac_ge;
+	case op_greater_than:
+		return ac_gt;
+	case op_less_eq_than:
+		return ac_le;
+	default:
+		error("Unsupported condition IL op");
+	}
+	return ac_al;
+}
+
 int a_extract_bits(int imm, int i_start, int i_end, int d_start, int d_end)
 {
 	int v;
 
-	if (d_end - d_start != i_end - i_start || i_start > i_end || d_start > d_end) {
+	if (d_end - d_start != i_end - i_start || i_start > i_end || d_start > d_end)
 		error("Invalid bit copy");
-	}
+
 	v = imm >> i_start;
 	v = v & ((2 << (i_end - i_start)) - 1);
 	v = v << d_start;
@@ -92,9 +113,8 @@ int a_mov(ar_cond cond, int io, int opcode, int s, int rn, int rd, int op2)
 			op2 = op2 >> 2;
 			shift -= 1;
 		}
-		if (op2 > 255) {
+		if (op2 > 255)
 			error("Unable to represent value"); /* value spans more than 8 bits */
-		}
 	}
 	return a_encode(cond, s + (opcode << 1) + (io << 5), rn, rd, (shift << 8) + (op2 & 255));
 }
@@ -186,9 +206,8 @@ int a_nop()
 int a_transfer(ar_cond cond, int l, int size, a_reg rn, a_reg rd, int ofs)
 {
 	int opcode = 64 + 16 + 8 + l;
-	if (size == 1) {
+	if (size == 1)
 		opcode += 4;
-	}
 	if (ofs < 0) {
 		opcode -= 8;
 		ofs = -ofs;

@@ -1,8 +1,5 @@
 /* rvcc C compiler - ELF file generator */
 
-#include <stdio.h>
-#include <stdlib.h>
-
 void e_write_footer_string(char *vals, int len)
 {
 	int i;
@@ -35,19 +32,18 @@ void e_write_footer_byte(char val)
 
 char e_extract_byte(int v, int b)
 {
-	if (b == 0) {
+	switch (b) {
+	case 0:
 		return v & 0xFF;
-	}
-	if (b == 1) {
+	case 1:
 		return (v >> 8) & 0xFF;
-	}
-	if (b == 2) {
+	case 2:
 		return (v >> 16) & 0xFF;
-	}
-	if (b == 3) {
+	case 3:
 		return (v >> 24) & 0xFF;
+	default:
+		abort();
 	}
-	abort();
 }
 
 void e_write_header_int(int val)
@@ -104,10 +100,13 @@ void e_generate_header(arch_t arch)
 	e_write_header_int(0);
 	e_write_header_byte(2); /* ET_EXEC */
 	e_write_header_byte(0);
-	if (arch == a_arm) {
+	switch (arch) {
+	case a_arm:
 		e_write_header_byte(0x28); /* ARM */
-	} else {
+		break;
+	case a_riscv:
 		e_write_header_byte(0xf3); /* RISC-V */
+		break;
 	}
 	e_write_header_byte(0);
 	e_write_header_int(1); /* ELF version */
@@ -116,10 +115,13 @@ void e_generate_header(arch_t arch)
 	e_write_header_int(_e_header_len + _e_code_idx + _e_data_idx + 39 + _e_symtab_idx +
 			   _e_strtab_idx); /* section header offset */
 	/* flags */
-	if (arch == a_arm) {
+	switch (arch) {
+	case a_arm:
 		e_write_header_int(0x5000200);
-	} else {
+		break;
+	case a_riscv:
 		e_write_header_int(0);
+		break;
 	}
 	e_write_header_byte(0x34); /* header size */
 	e_write_header_byte(0);
@@ -159,14 +161,12 @@ void e_generate_footer()
 {
 	/* symtab section */
 	int b;
-	for (b = 0; b < _e_symtab_idx; b++) {
+	for (b = 0; b < _e_symtab_idx; b++)
 		e_write_footer_byte(_e_symtab[b]);
-	}
 
 	/* strtab section */
-	for (b = 0; b < _e_strtab_idx; b++) {
+	for (b = 0; b < _e_strtab_idx; b++)
 		e_write_footer_byte(_e_strtab[b]);
-	}
 
 	/* shstr section; len = 39 */
 	e_write_footer_byte(0);
@@ -259,19 +259,16 @@ void e_generate_footer()
 void e_align()
 {
 	int remainder = _e_data_idx & 3;
-	if (remainder != 0) {
+	if (remainder != 0)
 		_e_data_idx += (4 - remainder);
-	}
 
 	remainder = _e_symtab_idx & 3;
-	if (remainder != 0) {
+	if (remainder != 0)
 		_e_symtab_idx += (4 - remainder);
-	}
 
 	remainder = _e_strtab_idx & 3;
-	if (remainder != 0) {
+	if (remainder != 0)
 		_e_strtab_idx += (4 - remainder);
-	}
 }
 
 void e_add_symbol(char *symbol, int len, int pc)
@@ -279,11 +276,10 @@ void e_add_symbol(char *symbol, int len, int pc)
 	e_write_symbol_int(_e_strtab_idx);
 	e_write_symbol_int(pc);
 	e_write_symbol_int(0);
-	if (pc == 0) {
+	if (pc == 0)
 		e_write_symbol_int(0);
-	} else {
+	else
 		e_write_symbol_int(1 << 16);
-	}
 
 	strncpy(_e_strtab + _e_strtab_idx, symbol, len);
 	_e_strtab_idx += len;
@@ -296,23 +292,18 @@ void e_output(char *outfile)
 	FILE *fp;
 	int i;
 
-	if (outfile == NULL) {
+	if (outfile == NULL)
 		outfile = "out.elf";
-	}
 
 	fp = fopen(outfile, "wb");
-	for (i = 0; i < _e_header_idx; i++) {
+	for (i = 0; i < _e_header_idx; i++)
 		fputc(_e_header[i], fp);
-	}
-	for (i = 0; i < _e_code_idx; i++) {
+	for (i = 0; i < _e_code_idx; i++)
 		fputc(_e_code[i], fp);
-	}
-	for (i = 0; i < _e_data_idx; i++) {
+	for (i = 0; i < _e_data_idx; i++)
 		fputc(_e_data[i], fp);
-	}
-	for (i = 0; i < _e_footer_idx; i++) {
+	for (i = 0; i < _e_footer_idx; i++)
 		fputc(_e_footer[i], fp);
-	}
 	fclose(fp);
 }
 

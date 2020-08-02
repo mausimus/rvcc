@@ -79,9 +79,8 @@ char l_read_char(int skip_whitespace)
 {
 	_source_idx++;
 	_l_next_char = _source[_source_idx];
-	if (skip_whitespace == 1) {
+	if (skip_whitespace == 1)
 		l_skip_whitespace();
-	}
 	return _l_next_char;
 }
 
@@ -91,9 +90,8 @@ int l_read_alnum(char *buffer, int max_len)
 	while (is_alnum(l_read_char(0))) {
 		buffer[bi] = _l_next_char;
 		bi++;
-		if (bi >= max_len) {
+		if (bi >= max_len)
 			error("Length exceeded");
-		}
 	}
 	buffer[bi] = 0;
 	return bi;
@@ -219,30 +217,28 @@ l_token l_next_token()
 
 		while (l_read_char(0) != '"' || special) {
 			if (i > 0 && _l_token_string[i - 1] == '\\') {
-				if (_l_next_char == 'n') {
+				if (_l_next_char == 'n')
 					_l_token_string[i - 1] = '\n';
-				} else if (_l_next_char == '"') {
+				else if (_l_next_char == '"')
 					_l_token_string[i - 1] = '"';
-				} else if (_l_next_char == 'r') {
+				else if (_l_next_char == 'r')
 					_l_token_string[i - 1] = '\r';
-				} else if (_l_next_char == '\'') {
+				else if (_l_next_char == '\'')
 					_l_token_string[i - 1] = '\'';
-				} else if (_l_next_char == 't') {
+				else if (_l_next_char == 't')
 					_l_token_string[i - 1] = '\t';
-				} else if (_l_next_char == '\\') {
+				else if (_l_next_char == '\\')
 					_l_token_string[i - 1] = '\\';
-				} else {
+				else
 					abort();
-				}
 			} else {
 				_l_token_string[i] = _l_next_char;
 				i++;
 			}
-			if (_l_next_char == '\\') {
+			if (_l_next_char == '\\')
 				special = 1;
-			} else {
+			else
 				special = 0;
-			}
 		}
 		_l_token_string[i] = 0;
 		l_read_char(1);
@@ -252,28 +248,26 @@ l_token l_next_token()
 		l_read_char(0);
 		if (_l_next_char == '\\') {
 			l_read_char(0);
-			if (_l_next_char == 'n') {
+			if (_l_next_char == 'n')
 				_l_token_string[0] = '\n';
-			} else if (_l_next_char == 'r') {
+			else if (_l_next_char == 'r')
 				_l_token_string[0] = '\r';
-			} else if (_l_next_char == '\'') {
+			else if (_l_next_char == '\'')
 				_l_token_string[0] = '\'';
-			} else if (_l_next_char == '"') {
+			else if (_l_next_char == '"')
 				_l_token_string[0] = '"';
-			} else if (_l_next_char == 't') {
+			else if (_l_next_char == 't')
 				_l_token_string[0] = '\t';
-			} else if (_l_next_char == '\\') {
+			else if (_l_next_char == '\\')
 				_l_token_string[0] = '\\';
-			} else {
+			else
 				abort();
-			}
 		} else {
 			_l_token_string[0] = _l_next_char;
 		}
 		_l_token_string[1] = 0;
-		if (l_read_char(0) != '\'') {
+		if (l_read_char(0) != '\'')
 			abort();
-		}
 		l_read_char(1);
 		return t_char;
 	}
@@ -383,7 +377,7 @@ l_token l_next_token()
 			l_read_char(1);
 			return t_pluseq;
 		}
-		l_skip_whitespace(1);
+		l_skip_whitespace();
 		return t_plus;
 	}
 	if (_l_next_char == ';') {
@@ -400,7 +394,7 @@ l_token l_next_token()
 			l_read_char(1);
 			return t_eq;
 		}
-		l_skip_whitespace(1);
+		l_skip_whitespace();
 		return t_assign;
 	}
 	if (_l_next_char == 0 || _l_next_char == -1) {
@@ -416,57 +410,40 @@ l_token l_next_token()
 		_l_token_string[i] = 0;
 		l_skip_whitespace();
 
-		if (strcmp(_l_token_string, "if") == 0) {
+		if (strcmp(_l_token_string, "if") == 0)
 			return t_if;
-		}
-		if (strcmp(_l_token_string, "while") == 0) {
+		if (strcmp(_l_token_string, "while") == 0)
 			return t_while;
-		}
-		if (strcmp(_l_token_string, "for") == 0) {
+		if (strcmp(_l_token_string, "for") == 0)
 			return t_for;
-		}
-		if (strcmp(_l_token_string, "do") == 0) {
+		if (strcmp(_l_token_string, "do") == 0)
 			return t_do;
-		}
-		if (strcmp(_l_token_string, "else") == 0) {
+		if (strcmp(_l_token_string, "else") == 0)
 			return t_else;
-		}
-		if (strcmp(_l_token_string, "return") == 0) {
+		if (strcmp(_l_token_string, "return") == 0)
 			return t_return;
-		}
-		if (strcmp(_l_token_string, "typedef") == 0) {
+		if (strcmp(_l_token_string, "typedef") == 0)
 			return t_typedef;
-		}
-		if (strcmp(_l_token_string, "enum") == 0) {
+		if (strcmp(_l_token_string, "enum") == 0)
 			return t_enum;
-		}
-		if (strcmp(_l_token_string, "struct") == 0) {
+		if (strcmp(_l_token_string, "struct") == 0)
 			return t_struct;
-		}
-		if (strcmp(_l_token_string, "sizeof") == 0) {
+		if (strcmp(_l_token_string, "sizeof") == 0)
 			return t_sizeof;
-		}
-		if (strcmp(_l_token_string, "switch") == 0) {
+		if (strcmp(_l_token_string, "switch") == 0)
 			return t_switch;
-		}
-		if (strcmp(_l_token_string, "case") == 0) {
+		if (strcmp(_l_token_string, "case") == 0)
 			return t_case;
-		}
-		if (strcmp(_l_token_string, "break") == 0) {
+		if (strcmp(_l_token_string, "break") == 0)
 			return t_break;
-		}
-		if (strcmp(_l_token_string, "default") == 0) {
+		if (strcmp(_l_token_string, "default") == 0)
 			return t_default;
-		}
-		if (strcmp(_l_token_string, "#define") == 0) {
+		if (strcmp(_l_token_string, "#define") == 0)
 			return t_define;
-		}
-		if (strcmp(_l_token_string, "#include") == 0) {
+		if (strcmp(_l_token_string, "#include") == 0)
 			return t_include;
-		}
-		if (strcmp(_l_token_string, "_asm") == 0) {
+		if (strcmp(_l_token_string, "_asm") == 0)
 			return t_asm;
-		}
 
 		alias = find_alias(_l_token_string);
 		if (alias != NULL) {
@@ -492,9 +469,8 @@ int l_accept(l_token token)
 int l_peek(l_token token, char *value)
 {
 	if (_l_next_token == token) {
-		if (value == NULL) {
+		if (value == NULL)
 			return 1;
-		}
 		strcpy(value, _l_token_string);
 		return 1;
 	}
@@ -503,18 +479,16 @@ int l_peek(l_token token, char *value)
 
 void l_ident(l_token token, char *value)
 {
-	if (_l_next_token != token) {
+	if (_l_next_token != token)
 		error("Unexpected token");
-	}
 	strcpy(value, _l_token_string);
 	_l_next_token = l_next_token();
 }
 
 void l_expect(l_token token)
 {
-	if (_l_next_token != token) {
+	if (_l_next_token != token)
 		error("Unexpected token");
-	}
 	_l_next_token = l_next_token();
 }
 

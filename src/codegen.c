@@ -1,14 +1,16 @@
 /* rvcc C compiler - IL->binary code generator */
 
-#include <stdio.h>
-#include <stdlib.h>
-
 int c_dest_reg(int param_no, arch_t arch)
 {
-	if (arch == a_arm) {
+	switch (arch) {
+	case a_arm:
 		return param_no;
+	case a_riscv:
+		return param_no + 10;
+	default:
+		error("Unsupported architecture");
+		return 0;
 	}
-	return param_no + 10;
 }
 
 /* calculates stack space needed for function's parameters */
@@ -24,12 +26,10 @@ void c_size_function(function_def *fn)
 	}
 
 	/* align to 16 bytes */
-	if ((s & 15) > 0) {
+	if ((s & 15) > 0)
 		s = (s - (s & 15)) + 16;
-	}
-	if (s > 2047) {
+	if (s > 2047)
 		error("Local stack size exceeded");
-	}
 
 	fn->params_size = s;
 }
@@ -40,15 +40,13 @@ int c_size_block(block_def *bd)
 	int size = 0, i, offset;
 
 	/* our offset starts from parent's offset */
-	if (bd->parent == NULL) {
-		if (bd->function != NULL) {
+	if (bd->parent == NULL)
+		if (bd->function != NULL)
 			offset = bd->function->params_size;
-		} else {
+		else
 			offset = 0;
-		}
-	} else {
+	else
 		offset = c_size_block(bd->parent);
-	}
 
 	/* declared locals */
 	for (i = 0; i < bd->next_local; i++) {
@@ -58,12 +56,10 @@ int c_size_block(block_def *bd)
 	}
 
 	/* align to 16 bytes */
-	if ((size & 15) > 0) {
+	if ((size & 15) > 0)
 		size = (size - (size & 15)) + 16;
-	}
-	if (size > 2047) {
+	if (size > 2047)
 		error("Local stack size exceeded");
-	}
 
 	bd->locals_size = size; /* save in block for stack allocation */
 	return size + offset;
@@ -76,14 +72,12 @@ void c_size_functions(int data_start)
 	int i;
 
 	/* size functions */
-	for (i = 0; i < _functions_idx; i++) {
+	for (i = 0; i < _functions_idx; i++)
 		c_size_function(&_functions[i]);
-	}
 
 	/* size blocks excl. global block */
-	for (i = 1; i < _blocks_idx; i++) {
+	for (i = 1; i < _blocks_idx; i++)
 		c_size_block(&_blocks[i]);
-	}
 
 	/* allocate data for globals, in block 0 */
 	bd = &_blocks[0];
@@ -99,107 +93,86 @@ void c_size_functions(int data_start)
 int c_get_code_length(il_instr *ii, arch_t arch)
 {
 	il_op op = ii->op;
+	function_def *fn;
+	block_def *bd;
 
-	if (op == op_entry_point) {
-		/* depends on number of parameters to push onto the stack */
-		function_def *fn = find_function(ii->string_param1);
+	switch (op) {
+	case op_entry_point:
+		fn = find_function(ii->string_param1);
 		return 16 + (fn->num_params << 2);
-	}
-	if (op == op_exit) {
-		return 12;
-	}
-	if (op == op_load_data_address) {
-		return 8;
-	}
-	if (op == op_function_call) {
-		if (ii->param_no != 0) {
+	case op_function_call:
+		if (ii->param_no != 0)
 			return 8;
-		}
 		return 4;
-	}
-	if (op == op_exit_point) {
-		return 16;
-	}
-	if (op == op_jump) {
-		return 4;
-	}
-	if (op == op_return) {
-		return 4;
-	}
-	if (op == op_generic) {
-		return 4;
-	}
-	if (op == op_load_numeric_constant) {
-		if (arch == a_arm) {
+	case op_load_numeric_constant:
+		switch (arch) {
+		case a_arm:
 			if (ii->int_param1 >= 0 && ii->int_param1 < 256)
 				return 4;
 			else
 				return 8;
+		case a_riscv:
+			if (ii->int_param1 > -2048 && ii->int_param1 < 2047)
+				return 4;
+			else
+				return 8;
+		default:
+			error("Unsupported architecture");
+			return 0;
 		}
-
-		if (ii->int_param1 > -2048 && ii->int_param1 < 2047)
+	case op_block_start:
+	case op_block_end:
+		bd = &_blocks[ii->int_param1];
+		if (bd->next_local > 0)
 			return 4;
 		else
-			return 8;
-	}
-	if (op == op_add) {
-		return 4;
-	}
-	if (op == op_sub) {
-		return 4;
-	}
-	if (op == op_mul) {
-		return 4;
-	}
-	if (op == op_label) {
-		return 0;
-	}
-	if (op == op_jz || op == op_jnz) {
-		return 8;
-	}
-	if (op == op_equals || op == op_not_equals || op == op_less_than || op == op_less_eq_than ||
-	    op == op_greater_than || op == op_greater_eq_than) {
+			return 0;
+	case op_equals:
+	case op_not_equals:
+	case op_less_than:
+	case op_less_eq_than:
+	case op_greater_than:
+	case op_greater_eq_than:
 		if (arch == a_arm)
 			return 12;
 		else
 			return 16;
-	}
-	if (op == op_push || op == op_pop) {
-		return 8;
-	}
-	if (op == op_block_start || op == op_block_end) {
-		block_def *bd = &_blocks[ii->int_param1];
-		if (bd->next_local > 0) {
-			return 4;
-		} else {
-			return 0;
-		}
-	}
-	if (op == op_get_var_addr) {
-		return 8;
-	}
-	if (op == op_read_addr || op == op_write_addr) {
-		return 4;
-	}
-	if (op == op_log_or || op == op_log_and || op == op_not) {
-		return 4;
-	}
-	if (op == op_bit_or || op == op_bit_and) {
-		return 4;
-	}
-	if (op == op_negate) {
-		return 4;
-	}
-	if (op == op_bit_lshift || op == op_bit_rshift) {
-		return 4;
-	}
-	if (op == op_start) {
-		return 8;
-	}
-	if (op == op_syscall) {
+	case op_syscall:
 		return 20;
+	case op_exit_point:
+		return 16;
+	case op_exit:
+		return 12;
+	case op_load_data_address:
+	case op_jz:
+	case op_jnz:
+	case op_push:
+	case op_pop:
+	case op_get_var_addr:
+	case op_start:
+		return 8;
+	case op_jump:
+	case op_return:
+	case op_generic:
+	case op_add:
+	case op_sub:
+	case op_mul:
+	case op_read_addr:
+	case op_write_addr:
+	case op_log_or:
+	case op_log_and:
+	case op_not:
+	case op_bit_or:
+	case op_bit_and:
+	case op_negate:
+	case op_bit_lshift:
+	case op_bit_rshift:
+		return 4;
+	case op_label:
+		return 0;
+	default:
+		error("Unsupported IL op");
 	}
-	error("Unsupported IL op");
 	return 0;
 }
 
@@ -224,85 +197,92 @@ int c_calculate_code_length(arch_t arch)
 void c_generate(arch_t arch)
 {
 	int i, data_start, code_start;
+	int stack_size = 0;
+	block_def *bd = NULL;
 
 	code_start = _e_code_start; /* ELF headers size */
 	data_start = c_calculate_code_length(arch);
 	c_size_functions(code_start + data_start);
 
-	printf("code_start = %#010x, data_start = %#010x\n", code_start, data_start);
-
 	for (i = 0; i < _il_idx; i++) {
-		int stack_size, j;
+		int j;
 		variable_def *var;
 		function_def *fn;
-		block_def *bd;
 
 		il_instr *ii = &_il[i];
 		il_op op = ii->op;
 		int pc = _e_code_idx;
+		int offset, ofs, val;
 		int dest_reg = c_dest_reg(ii->param_no, arch);
 		int op_reg = c_dest_reg(ii->int_param1, arch);
 
 		/* format IL log prefix */
 		printf("%4d %3d  %#010x     ", i, op, code_start + pc);
-		for (j = 0; j < _c_block_level; j++) {
+		for (j = 0; j < _c_block_level; j++)
 			printf("  ");
-		}
 
-		if (op == op_load_data_address) {
-			/* lookup address of a constant in data section as offset from PC */
-			if (arch == a_arm) {
-				int ofs = code_start + data_start + ii->int_param1;
+		switch (op) {
+		case op_load_data_address:
+			/* lookup address of a constant in data section */
+			ofs = data_start + ii->int_param1;
+			switch (arch) {
+			case a_arm:
+				ofs += code_start;
 				c_emit(a_movw(ac_al, dest_reg, ofs));
 				c_emit(a_movt(ac_al, dest_reg, ofs));
-			} else {
-				int ofs = data_start + ii->int_param1 - pc;
+				break;
+			case a_riscv:
+				ofs -= pc;
 				c_emit(r_auipc(dest_reg, r_hi(ofs)));
 				c_emit(r_addi(dest_reg, dest_reg, r_lo(ofs)));
+				break;
 			}
-
 			printf("  x%d := &data[%d]", dest_reg, ii->int_param1);
-		}
-		if (op == op_load_numeric_constant) {
+			break;
+		case op_load_numeric_constant:
 			/* load numeric constant */
-			int val = ii->int_param1;
-			if (arch == a_arm) {
+			val = ii->int_param1;
+			switch (arch) {
+			case a_arm:
 				if (val >= 0 && val < 256) {
 					c_emit(a_mov_i(ac_al, dest_reg, val));
 				} else {
 					c_emit(a_movw(ac_al, dest_reg, val));
 					c_emit(a_movt(ac_al, dest_reg, val));
 				}
-			} else {
+				break;
+			case a_riscv:
 				if (val > -2048 && val < 2047) {
 					c_emit(r_addi(dest_reg, r_zero, r_lo(val)));
 				} else {
 					c_emit(r_lui(dest_reg, r_hi(val)));
 					c_emit(r_addi(dest_reg, dest_reg, r_lo(val)));
 				}
+				break;
 			}
 			printf("  x%d := %d", dest_reg, ii->int_param1);
-		}
-		if (op == op_get_var_addr) {
+			break;
+		case op_get_var_addr:
 			/* lookup address of a variable */
-			int offset;
-
 			var = find_global_variable(ii->string_param1);
 			if (var != NULL) {
 				int ofs = data_start + var->offset;
-				if (arch == a_arm) {
+				switch (arch) {
+				case a_arm:
 					/* need to find the variable offset in data section, absolute */
-					ofs += _e_code_start;
+					ofs += code_start;
 
 					c_emit(a_movw(ac_al, dest_reg, ofs));
 					c_emit(a_movt(ac_al, dest_reg, ofs));
-				} else {
+					break;
+				case a_riscv:
 					/* need to find the variable offset in data section, from PC */
 					ofs -= pc;
 
 					c_emit(r_auipc(dest_reg, r_hi(ofs)));
 					offset = r_lo(ofs);
 					c_emit(r_addi(dest_reg, dest_reg, offset));
+					break;
 				}
 			} else {
 				/* need to find the variable offset on stack, i.e. from s0 */
@@ -311,312 +291,393 @@ void c_generate(arch_t arch)
 					abort(); /* not found? */
 
 				offset = -var->offset;
-				if (arch == a_arm) {
+				switch (arch) {
+				case a_arm:
 					c_emit(a_add_i(ac_al, dest_reg, a_s0, offset & 255));
 					c_emit(a_add_i(ac_al, dest_reg, dest_reg, offset - (offset & 255)));
-				} else {
+					break;
+				case a_riscv:
 					c_emit(r_addi(dest_reg, r_s0, 0));
 					c_emit(r_addi(dest_reg, dest_reg, offset));
+					break;
 				}
 			}
-
 			printf("  x%d = &%s", dest_reg, ii->string_param1);
-		}
-		if (op == op_read_addr) {
+			break;
+		case op_read_addr:
 			/* read (dereference) memory address */
-			if (ii->int_param2 == 4) {
-				if (arch == a_arm)
+			switch (ii->int_param2) {
+			case 4:
+				switch (arch) {
+				case a_arm:
 					c_emit(a_lw(ac_al, dest_reg, op_reg, 0));
-				else
+					break;
+				case a_riscv:
 					c_emit(r_lw(dest_reg, op_reg, 0));
-			} else if (ii->int_param2 == 1) {
-				if (arch == a_arm)
+					break;
+				}
+				break;
+			case 1:
+				switch (arch) {
+				case a_arm:
 					c_emit(a_lb(ac_al, dest_reg, op_reg, 0));
-				else
+					break;
+				case a_riscv:
 					c_emit(r_lb(dest_reg, op_reg, 0));
-			} else
-				abort();
-
+					break;
+				}
+				break;
+			default:
+				error("Unsupported word size");
+			}
 			printf("  x%d = *x%d (%d)", dest_reg, op_reg, ii->int_param2);
-		}
-		if (op == op_write_addr) {
+			break;
+		case op_write_addr:
 			/* write at memory address */
-			if (ii->int_param2 == 4) {
-				if (arch == a_arm)
+			switch (ii->int_param2) {
+			case 4:
+				switch (arch) {
+				case a_arm:
 					c_emit(a_sw(ac_al, dest_reg, op_reg, 0));
-				else
+					break;
+				case a_riscv:
 					c_emit(r_sw(dest_reg, op_reg, 0));
-			} else if (ii->int_param2 == 1) {
-				if (arch == a_arm)
+					break;
+				}
+				break;
+			case 1:
+				switch (arch) {
+				case a_arm:
 					c_emit(a_sb(ac_al, dest_reg, op_reg, 0));
-				else
+					break;
+				case a_riscv:
 					c_emit(r_sb(dest_reg, op_reg, 0));
-			} else
-				abort();
-
+					break;
+				}
+				break;
+			default:
+				error("Unsupported word size");
+			}
 			printf("  *x%d = x%d (%d)", op_reg, dest_reg, ii->int_param2);
-		}
-		if (op == op_jump) {
+			break;
+		case op_jump: {
 			/* unconditional jump to an IL-index */
 			int jump_instr_index = ii->int_param1;
 			il_instr *jump_instr = &_il[jump_instr_index];
 			int jump_location = jump_instr->code_offset;
-			int ofs = jump_location - pc;
+			ofs = jump_location - pc;
 
-			if (arch == a_arm)
+			switch (arch) {
+			case a_arm:
 				c_emit(a_b(ac_al, ofs));
-			else
+				break;
+			case a_riscv:
 				c_emit(r_jal(r_zero, ofs));
-
+				break;
+			}
 			printf("  -> %d", ii->int_param1);
-		}
-		if (op == op_return) {
+		} break;
+		case op_return: {
 			/* jump to function exit */
 			function_def *fd = find_function(ii->string_param1);
 			int jump_instr_index = fd->exit_point;
 			il_instr *jump_instr = &_il[jump_instr_index];
 			int jump_location = jump_instr->code_offset;
-			int ofs = jump_location - pc;
+			ofs = jump_location - pc;
 
-			if (arch == a_arm)
+			switch (arch) {
+			case a_arm:
 				c_emit(a_b(ac_al, ofs));
-			else
+				break;
+			case a_riscv:
 				c_emit(r_jal(r_zero, ofs));
-
+				break;
+			}
 			printf("  return %s", ii->string_param1);
-		}
-		if (op == op_function_call) {
+		} break;
+		case op_function_call: {
 			/* function call */
-			int ofs;
 			int jump_instr_index;
 			il_instr *jump_instr;
 			int jump_location;
 
 			/* need to find offset */
 			fn = find_function(ii->string_param1);
-
 			jump_instr_index = fn->entry_point;
 			jump_instr = &_il[jump_instr_index];
 			jump_location = jump_instr->code_offset;
 			ofs = jump_location - pc;
 
-			if (arch == a_arm) {
+			switch (arch) {
+			case a_arm:
 				c_emit(a_bl(ac_al, ofs));
 				if (dest_reg != a_r0)
 					c_emit(a_mov_r(ac_al, dest_reg, a_r0));
-			} else {
+				break;
+			case a_riscv:
 				c_emit(r_jal(r_ra, ofs));
 				if (dest_reg != r_a0)
 					c_emit(r_addi(dest_reg, r_a0, 0));
+				break;
 			}
-
 			printf("  x%d := %s() @ %d", dest_reg, ii->string_param1, fn->entry_point);
-		}
-		if (op == op_push) {
-			if (arch == a_arm) {
+		} break;
+		case op_push:
+			switch (arch) {
+			case a_arm:
 				c_emit(a_add_i(ac_al, a_sp, a_sp, -16)); /* 16 aligned although we only need 4 */
 				c_emit(a_sw(ac_al, dest_reg, a_sp, 0));
-			} else {
+				break;
+			case a_riscv:
 				c_emit(r_addi(r_sp, r_sp, -16)); /* 16 aligned although we only need 4 */
 				c_emit(r_sw(dest_reg, r_sp, 0));
+				break;
 			}
-
 			printf("  push x%d", dest_reg);
-		}
-		if (op == op_pop) {
-			if (arch == a_arm) {
+			break;
+		case op_pop:
+			switch (arch) {
+			case a_arm:
 				c_emit(a_lw(ac_al, dest_reg, a_sp, 0));
 				c_emit(a_add_i(ac_al, a_sp, a_sp, 16)); /* 16 aligned although we only need 4 */
-			} else {
+				break;
+			case a_riscv:
 				c_emit(r_lw(dest_reg, r_sp, 0));
 				c_emit(r_addi(r_sp, r_sp, 16)); /* 16 aligned although we only need 4 */
+				break;
 			}
-
 			printf("  pop x%d", dest_reg);
-		}
-		if (op == op_exit_point) {
+			break;
+		case op_exit_point:
 			/* restore previous frame */
-			if (arch == a_arm) {
+			switch (arch) {
+			case a_arm:
 				c_emit(a_add_i(ac_al, a_sp, a_s0, 16));
 				c_emit(a_lw(ac_al, a_lr, a_sp, -8));
 				c_emit(a_lw(ac_al, a_s0, a_sp, -4));
 				c_emit(a_mov_r(ac_al, a_pc, a_lr));
-			} else {
+				break;
+			case a_riscv:
 				c_emit(r_addi(r_sp, r_s0, 16));
 				c_emit(r_lw(r_ra, r_sp, -8));
 				c_emit(r_lw(r_s0, r_sp, -4));
 				c_emit(r_jalr(r_zero, r_ra, 0));
+				break;
 			}
-
 			fn = NULL;
 			printf("  exit %s", ii->string_param1);
-		}
-		if (op == op_add) {
-			if (arch == a_arm)
+			break;
+		case op_add:
+			switch (arch) {
+			case a_arm:
 				c_emit(a_add_r(ac_al, dest_reg, dest_reg, op_reg));
-			else
+				break;
+			case a_riscv:
 				c_emit(r_add(dest_reg, dest_reg, op_reg));
+				break;
+			}
 
 			printf("  x%d += x%d", dest_reg, op_reg);
-		}
-		if (op == op_sub) {
-			if (arch == a_arm)
+			break;
+		case op_sub:
+			switch (arch) {
+			case a_arm:
 				c_emit(a_sub_r(ac_al, dest_reg, dest_reg, op_reg));
-			else
+				break;
+			case a_riscv:
 				c_emit(r_sub(dest_reg, dest_reg, op_reg));
-
-			printf("  x%d -= x%d", dest_reg, op_reg);
-		}
-		if (op == op_mul) {
-			if (arch == a_arm)
-				c_emit(a_mul(ac_al, dest_reg, dest_reg, op_reg));
-			else
-				c_emit(r_mul(dest_reg, dest_reg, op_reg));
-
-			printf("  x%d *= x%d", dest_reg, op_reg);
-		}
-		if (op == op_negate) {
-			if (arch == a_arm)
-				c_emit(a_rsb_i(ac_al, dest_reg, 0, dest_reg));
-			else
-				c_emit(r_sub(dest_reg, r_zero, dest_reg));
-
-			printf("  -x%d", dest_reg);
-		}
-		if (op == op_label) {
-			if (ii->string_param1 != 0) {
-				/* TODO: lazy eval */
-				if (strlen(ii->string_param1) > 0) {
-					e_add_symbol(ii->string_param1, strlen(ii->string_param1), code_start + pc);
-				}
+				break;
 			}
+			printf("  x%d -= x%d", dest_reg, op_reg);
+			break;
+		case op_mul:
+			switch (arch) {
+			case a_arm:
+				c_emit(a_mul(ac_al, dest_reg, dest_reg, op_reg));
+				break;
+			case a_riscv:
+				c_emit(r_mul(dest_reg, dest_reg, op_reg));
+				break;
+			}
+			printf("  x%d *= x%d", dest_reg, op_reg);
+			break;
+		case op_negate:
+			switch (arch) {
+			case a_arm:
+				c_emit(a_rsb_i(ac_al, dest_reg, 0, dest_reg));
+				break;
+			case a_riscv:
+				c_emit(r_sub(dest_reg, r_zero, dest_reg));
+				break;
+			}
+			printf("  -x%d", dest_reg);
+			break;
+		case op_label:
+			if (ii->string_param1 != 0)
+				/* TODO: lazy eval */
+				if (strlen(ii->string_param1) > 0)
+					e_add_symbol(ii->string_param1, strlen(ii->string_param1), code_start + pc);
 			printf(" _:");
-		}
-		if (op == op_equals || op == op_not_equals || op == op_less_than || op == op_less_eq_than ||
-		    op == op_greater_than || op == op_greater_eq_than) {
+			break;
+		case op_equals:
+		case op_not_equals:
+		case op_less_than:
+		case op_less_eq_than:
+		case op_greater_than:
+		case op_greater_eq_than:
 			/* we want 1/nonzero if equ, 0 otherwise */
-			if (arch == a_arm) {
-				ar_cond cond;
-
+			switch (arch) {
+			case a_arm: {
+				ar_cond cond = a_get_cond(op);
 				c_emit(a_cmp_r(ac_al, dest_reg, dest_reg, op_reg));
 				c_emit(a_zero(dest_reg));
-
-				if (op == op_equals)
-					cond = ac_eq;
-				else if (op == op_not_equals)
-					cond = ac_ne;
-				else if (op == op_less_than)
-					cond = ac_lt;
-				else if (op == op_greater_eq_than)
-					cond = ac_ge;
-				else if (op == op_greater_than)
-					cond = ac_gt;
-				else if (op == op_less_eq_than)
-					cond = ac_le;
-
 				c_emit(a_mov_i(cond, dest_reg, 1));
-			} else {
-				if (op == op_equals)
+			} break;
+			case a_riscv:
+				switch (op) {
+				case op_equals:
 					c_emit(r_beq(dest_reg, op_reg, 12));
-				else if (op == op_not_equals)
+					break;
+				case op_not_equals:
 					c_emit(r_bne(dest_reg, op_reg, 12));
-				else if (op == op_less_than)
+					break;
+				case op_less_than:
 					c_emit(r_blt(dest_reg, op_reg, 12));
-				else if (op == op_greater_eq_than)
+					break;
+				case op_greater_eq_than:
 					c_emit(r_bge(dest_reg, op_reg, 12));
-				else if (op == op_greater_than)
+					break;
+				case op_greater_than:
 					c_emit(r_blt(op_reg, dest_reg, 12));
-				else if (op == op_less_eq_than)
+					break;
+				case op_less_eq_than:
 					c_emit(r_bge(op_reg, dest_reg, 12));
-
+					break;
+				default:
+					error("Unsupported conditional IL op");
+					break;
+				}
 				c_emit(r_addi(dest_reg, r_zero, 0));
 				c_emit(r_jal(r_zero, 8));
 				c_emit(r_addi(dest_reg, r_zero, 1));
+				break;
 			}
 
-			if (op == op_equals)
+			switch (op) {
+			case op_equals:
 				printf("  x%d == x%d ?", dest_reg, op_reg);
-			else if (op == op_not_equals)
+				break;
+			case op_not_equals:
 				printf("  x%d != x%d ?", dest_reg, op_reg);
-			else if (op == op_less_than)
+				break;
+			case op_less_than:
 				printf("  x%d < x%d ?", dest_reg, op_reg);
-			else if (op == op_greater_eq_than)
+				break;
+			case op_greater_eq_than:
 				printf("  x%d >= x%d ?", dest_reg, op_reg);
-			else if (op == op_greater_than)
+				break;
+			case op_greater_than:
 				printf("  x%d > x%d ?", dest_reg, op_reg);
-			else if (op == op_less_eq_than)
+				break;
+			case op_less_eq_than:
 				printf("  x%d <= x%d ?", dest_reg, op_reg);
-		}
-		if (op == op_log_and || op == op_log_or) {
-			if (op == op_log_and) {
-				/* we assume both have to be 1, they can't be just nonzero */
-				if (arch == a_arm)
-					c_emit(a_and_r(ac_al, dest_reg, dest_reg, op_reg));
-				else
-					c_emit(r_and(dest_reg, dest_reg, op_reg));
-
-				printf("  x%d &&= x%d", dest_reg, op_reg);
-			} else if (op == op_log_or) {
-				if (arch == a_arm)
-					c_emit(a_or_r(ac_al, dest_reg, dest_reg, op_reg));
-				else
-					c_emit(r_or(dest_reg, dest_reg, op_reg));
-
-				printf("  x%d ||= x%d", dest_reg, op_reg);
+				break;
+			default:
+				break;
 			}
-		}
-		if (op == op_bit_and || op == op_bit_or) {
-			if (op == op_bit_and) {
-				if (arch == a_arm)
-					c_emit(a_and_r(ac_al, dest_reg, dest_reg, op_reg));
-				else
-					c_emit(r_and(dest_reg, dest_reg, op_reg));
-
-				printf("  x%d &= x%d", dest_reg, op_reg);
-			} else if (op == op_bit_or) {
-				if (arch == a_arm)
-					c_emit(a_or_r(ac_al, dest_reg, dest_reg, op_reg));
-				else
-					c_emit(r_or(dest_reg, dest_reg, op_reg));
-
-				printf("  x%d |= x%d", dest_reg, op_reg);
+			break;
+		case op_log_and:
+			/* we assume both have to be 1, they can't be just nonzero */
+			switch (arch) {
+			case a_arm:
+				c_emit(a_and_r(ac_al, dest_reg, dest_reg, op_reg));
+				break;
+			case a_riscv:
+				c_emit(r_and(dest_reg, dest_reg, op_reg));
+				break;
 			}
-		}
-		if (op == op_bit_lshift || op == op_bit_rshift) {
-			if (op == op_bit_lshift) {
-				if (arch == a_arm)
-					c_emit(a_sll(ac_al, dest_reg, dest_reg, op_reg));
-				else
-					c_emit(r_sll(dest_reg, dest_reg, op_reg));
-
-				printf("  x%d <<= x%d", dest_reg, op_reg);
-			} else if (op == op_bit_rshift) {
-				if (arch == a_arm)
-					c_emit(a_srl(ac_al, dest_reg, dest_reg, op_reg));
-				else
-					c_emit(r_srl(dest_reg, dest_reg, op_reg));
-
-				printf("  x%d >>= x%d", dest_reg, op_reg);
+			printf("  x%d &&= x%d", dest_reg, op_reg);
+			break;
+		case op_log_or:
+			switch (arch) {
+			case a_arm:
+				c_emit(a_or_r(ac_al, dest_reg, dest_reg, op_reg));
+				break;
+			case a_riscv:
+				c_emit(r_or(dest_reg, dest_reg, op_reg));
+				break;
 			}
-		}
-		if (op == op_not) {
+			printf("  x%d ||= x%d", dest_reg, op_reg);
+			break;
+		case op_bit_and:
+			switch (arch) {
+			case a_arm:
+				c_emit(a_and_r(ac_al, dest_reg, dest_reg, op_reg));
+				break;
+			case a_riscv:
+				c_emit(r_and(dest_reg, dest_reg, op_reg));
+				break;
+			}
+			printf("  x%d &= x%d", dest_reg, op_reg);
+			break;
+		case op_bit_or:
+			switch (arch) {
+			case a_arm:
+				c_emit(a_or_r(ac_al, dest_reg, dest_reg, op_reg));
+				break;
+			case a_riscv:
+				c_emit(r_or(dest_reg, dest_reg, op_reg));
+				break;
+			}
+			printf("  x%d |= x%d", dest_reg, op_reg);
+			break;
+		case op_bit_lshift:
+			switch (arch) {
+			case a_arm:
+				c_emit(a_sll(ac_al, dest_reg, dest_reg, op_reg));
+				break;
+			case a_riscv:
+				c_emit(r_sll(dest_reg, dest_reg, op_reg));
+				break;
+			}
+			printf("  x%d <<= x%d", dest_reg, op_reg);
+			break;
+		case op_bit_rshift:
+			switch (arch) {
+			case a_arm:
+				c_emit(a_srl(ac_al, dest_reg, dest_reg, op_reg));
+				break;
+			case a_riscv:
+				c_emit(r_srl(dest_reg, dest_reg, op_reg));
+				break;
+			}
+
+			printf("  x%d >>= x%d", dest_reg, op_reg);
+			break;
+		case op_not:
 			/* 1 if zero, 0 if nonzero */
-			if (arch == a_arm)
+			switch (arch) {
+			case a_arm:
 				/* only works for 1/0 */
 				c_emit(a_rsb_i(ac_al, dest_reg, 1, dest_reg));
-			else
+				break;
+			case a_riscv:
 				/* only works for small range integers */
 				c_emit(r_sltiu(dest_reg, dest_reg, 1));
+				break;
+			}
 			printf("  !x%d", dest_reg);
-		}
-		if (op == op_jz || op == op_jnz) {
+			break;
+		case op_jz:
+		case op_jnz: {
 			/* conditional jumps to IL-index */
 			int jump_instr_index = ii->int_param1;
 			il_instr *jump_instr = &_il[jump_instr_index];
 			int jump_location = jump_instr->code_offset;
 			int ofs = jump_location - pc - 4;
 
-			if (arch == a_arm) {
+			switch (arch) {
+			case a_arm:
 				c_emit(a_teq(dest_reg));
 				if (op == op_jz) {
 					c_emit(a_b(ac_eq, ofs));
@@ -625,14 +686,15 @@ void c_generate(arch_t arch)
 					c_emit(a_b(ac_ne, ofs));
 					printf("  if 1 -> %d", ii->int_param1);
 				}
-			} else {
+				break;
+			case a_riscv:
 				if (ofs >= -4096 && ofs <= 4095) {
 					/* near jump (branch) */
 					if (op == op_jz) {
 						c_emit(r_nop());
 						c_emit(r_beq(dest_reg, r_zero, ofs));
 						printf("  if 0 -> %d", ii->int_param1);
-					} else {
+					} else if (op == op_jnz) {
 						c_emit(r_nop());
 						c_emit(r_bne(dest_reg, r_zero, ofs));
 						printf("  if 1 -> %d", ii->int_param1);
@@ -643,54 +705,57 @@ void c_generate(arch_t arch)
 						c_emit(r_bne(dest_reg, r_zero, 8)); /* skip next instruction */
 						c_emit(r_jal(r_zero, ofs));
 						printf("  if 0 --> %d", ii->int_param1);
-					} else {
+					} else if (op == op_jnz) {
 						c_emit(r_beq(dest_reg, r_zero, 8));
 						c_emit(r_jal(r_zero, ofs));
 						printf("  if 1 --> %d", ii->int_param1);
 					}
 				}
+				break;
 			}
-		}
-		if (op == op_generic) {
+		} break;
+		case op_generic:
 			c_emit(ii->int_param1);
 			printf("  asm %#010x", ii->int_param1);
-		}
-		if (op == op_block_start) {
+			break;
+		case op_block_start:
 			bd = &_blocks[ii->int_param1];
-
 			if (bd->next_local > 0) {
 				/* reserve stack space for locals */
-				if (arch == a_arm)
+				switch (arch) {
+				case a_arm:
 					c_emit(a_add_i(ac_al, a_sp, a_sp, -bd->locals_size));
-				else
+					break;
+				case a_riscv:
 					c_emit(r_addi(r_sp, r_sp, -bd->locals_size));
-
+					break;
+				}
 				stack_size += bd->locals_size;
 			}
 			printf("  {");
 			_c_block_level++;
-		}
-		if (op == op_block_end) {
+			break;
+		case op_block_end:
 			bd = &_blocks[ii->int_param1]; /* should not be necessarry */
-
 			if (bd->next_local > 0) {
 				/* remove stack space for locals */
-				if (arch == a_arm)
+				switch (arch) {
+				case a_arm:
 					c_emit(a_add_i(ac_al, a_sp, a_sp, bd->locals_size));
-				else
+					break;
+				case a_riscv:
 					c_emit(r_addi(r_sp, r_sp, bd->locals_size));
-
+					break;
+				}
 				stack_size -= bd->locals_size;
 			}
 			/* bd is current block */
 			bd = bd->parent;
-
 			printf("}");
 			_c_block_level--;
-		}
-		if (op == op_entry_point) {
+			break;
+		case op_entry_point: {
 			int pn, ps;
-
 			fn = find_function(ii->string_param1);
 			ps = fn->params_size;
 
@@ -698,67 +763,84 @@ void c_generate(arch_t arch)
 			e_add_symbol(ii->string_param1, strlen(ii->string_param1), code_start + pc);
 
 			/* create stack space for params and parent frame */
-			if (arch == a_arm) {
+			switch (arch) {
+			case a_arm:
 				c_emit(a_add_i(ac_al, a_sp, a_sp, -16 - ps));
 				c_emit(a_sw(ac_al, a_s0, a_sp, 12 + ps));
 				c_emit(a_sw(ac_al, a_lr, a_sp, 8 + ps));
 				c_emit(a_add_i(ac_al, a_s0, a_sp, ps));
-			} else {
+				break;
+			case a_riscv:
 				c_emit(r_addi(r_sp, r_sp, -16 - ps));
 				c_emit(r_sw(r_s0, r_sp, 12 + ps));
 				c_emit(r_sw(r_ra, r_sp, 8 + ps));
 				c_emit(r_addi(r_s0, r_sp, ps));
+				break;
 			}
-
 			stack_size = ps;
 
 			/* push parameters on stack */
 			for (pn = 0; pn < fn->num_params; pn++) {
-				if (arch == a_arm)
+				switch (arch) {
+				case a_arm:
 					c_emit(a_sw(ac_al, a_r0 + pn, a_s0, -fn->param_defs[pn].offset));
-				else
+					break;
+				case a_riscv:
 					c_emit(r_sw(r_a0 + pn, r_s0, -fn->param_defs[pn].offset));
+					break;
+				}
 			}
-
 			printf("%s:", ii->string_param1);
-		}
-		if (op == op_start) {
-			if (arch == a_arm) {
+		} break;
+		case op_start:
+			switch (arch) {
+			case a_arm:
 				c_emit(a_lw(ac_al, a_r0, a_sp, 0)); /* argc */
 				c_emit(a_add_i(ac_al, a_r1, a_sp, 4)); /* argv */
-			} else {
+				break;
+			case a_riscv:
 				c_emit(r_lw(r_a0, r_sp, 0)); /* argc */
 				c_emit(r_addi(r_a1, r_sp, 4)); /* argv */
+				break;
 			}
 			printf("  start");
-		}
-		if (op == op_syscall) {
-			if (arch == a_arm) {
+			break;
+		case op_syscall:
+			switch (arch) {
+			case a_arm:
 				c_emit(a_mov_r(ac_al, a_r7, a_r0));
 				c_emit(a_mov_r(ac_al, a_r0, a_r1));
 				c_emit(a_mov_r(ac_al, a_r1, a_r2));
 				c_emit(a_mov_r(ac_al, a_r2, a_r3));
 				c_emit(a_swi());
-			} else {
+				break;
+			case a_riscv:
 				c_emit(r_addi(r_a7, r_a0, 0));
 				c_emit(r_addi(r_a0, r_a1, 0));
 				c_emit(r_addi(r_a1, r_a2, 0));
 				c_emit(r_addi(r_a2, r_a3, 0));
 				c_emit(r_ecall());
+				break;
 			}
 			printf("  syscall");
-		}
-		if (op == op_exit) {
-			if (arch == a_arm) {
+			break;
+		case op_exit:
+			switch (arch) {
+			case a_arm:
 				c_emit(a_mov_i(ac_al, a_r0, 0));
 				c_emit(a_mov_i(ac_al, a_r7, 1));
 				c_emit(a_swi());
-			} else {
+				break;
+			case a_riscv:
 				c_emit(r_addi(r_a0, r_zero, 0));
 				c_emit(r_addi(r_a7, r_zero, 93));
 				c_emit(r_ecall());
+				break;
 			}
 			printf("  exit");
+			break;
+		default:
+			error("Unsupported IL op");
 		}
 		printf("\n");
 	}
