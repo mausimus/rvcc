@@ -91,7 +91,7 @@ void e_generate_header(arch_t arch)
 	/* flags */
 	switch (arch) {
 	case a_arm:
-		e_write_header_int(0x5000400);
+		e_write_header_int(0x5000200);
 		break;
 	case a_riscv:
 		e_write_header_int(0);

@@ -15,11 +15,14 @@
 #include "parser.c"
 #include "codegen.c"
 
+/* embedded clib */
+#include "rvclib.inc"
+
 int main(int argc, char *argv[])
 {
 	int i = 1, clib = 1;
 	arch_t arch = a_riscv;
-	char *outfile = NULL, *infile = NULL, *libpath = NULL;
+	char *outfile = NULL, *infile = NULL;
 
 	printf("rvcc C compiler\n");
 
@@ -28,8 +31,6 @@ int main(int argc, char *argv[])
 			clib = 0;
 		else if (strcmp(argv[i], "-march=arm") == 0)
 			arch = a_arm;
-		else if (strncmp(argv[i], "-L", 2) == 0)
-			libpath = argv[i] + 2;
 		else if (strcmp(argv[i], "-o") == 0)
 			if (i < argc + 1) {
 				outfile = argv[i + 1];
@@ -53,12 +54,7 @@ int main(int argc, char *argv[])
 
 	/* include clib */
 	if (clib) {
-		char lib[MAX_TOKEN_LEN];
-		if (libpath == NULL)
-			libpath = "lib";
-		strcpy(lib, libpath);
-		strcpy(lib + strlen(libpath), "/rvclib.c");
-		s_load(lib);
+		s_clib();
 	}
 
 	/* load source code */

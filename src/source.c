@@ -9,6 +9,12 @@ void s_write_string(char *src)
 	}
 }
 
+/* shortcut for embedding */
+void __s(char *src)
+{
+	s_write_string(src);
+}
+
 void s_load(char *file)
 {
 	FILE *f;

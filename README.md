@@ -5,9 +5,10 @@ Bootstrapped C compiler for 32-bit RISC-V and ARM ISAs
 ### Features
 
 * implements a subset of C language sufficient to compile itself
-* generates Linux- and emulator-friendly ELF binaries (RV32IM/ARMv7)
+* generates executable Linux ELF binaries for RV32IM and ARMv7
+* includes an embedded minimal Linux C standard library for basic I/O
+* no dependencies - it can work as a microcompiler on environments without GCC
 * written in ANSI C it can cross-compile from any platform
-* includes a minimal Linux C standard library for basic I/O
 * simple two-pass compilation process: source -> IL -> binary
 * lexer, parser and code generator all implemented by hand
 
@@ -89,6 +90,8 @@ ARM output generates code compatible with ARMv7 ISA which is owned by [Arm Holdi
 ARM is a RISC ISA but it offers a wider variety of operations by adding conditional execution codes, automatic index increments, 
 value shifts etc. to many instructions resulting in potentially denser code (fewer instructions required), at the expense of reducing
 the number of bits available for immediate values.
+
+Compiler generates Linux ARMv7 EABI-compliant binaries which can be run directly on a Raspberry Pi (tested on Pi 4 Model B running armv7l).
 
 ### Example RISC-V output
 

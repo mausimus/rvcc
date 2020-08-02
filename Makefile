@@ -22,12 +22,17 @@ clean:
 	-$(RM) $(OBJECTS)
 	-$(RM) $(TESTBINS) tests/*.log tests/*.lst
 	-$(RM) $(BIN)/rvcc*.elf $(BIN)/rvcc*.log
+	-$(RM) $(BIN)/embed
 
 tests/%.elf: tests/%.c
 	./$(BIN)/$(EXECUTABLE) -L$(LIBDIRS) -o $@ $^ >$(basename $^).log
 	rv-bin dump -a $@ >$(basename $@).lst
 
 tests: all $(TESTBINS)
+
+clib: 
+	$(CC) $(CFLAGS) $(CLIBS) lib/embed.c -o $(BIN)/embed $(LIBRARIES)
+	$(BIN)/embed $(LIB)/rvclib.c $(SRC)/rvclib.inc
 
 bootstrap-riscv: all
 	./$(BIN)/$(EXECUTABLE) -o $(BIN)/rvcc_riscv_1.elf -march=riscv -L$(LIBDIRS) $(SRC)/rvcc.c >$(BIN)/rvcc_riscv_1.log
