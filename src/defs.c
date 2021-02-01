@@ -163,3 +163,18 @@ typedef struct defs {
 	char alias[MAX_VAR_LEN];
 	int value;
 } constant_def;
+
+typedef struct {
+	int code_start;
+	int data_start;
+	int dest_reg;
+	int op_reg;
+	int pc;
+} backend_state;
+/*
+typedef struct {
+	int (*c_dest_reg)(int param_no);
+	int (*c_get_code_length)(il_instr *ii);
+	void (*op_load_data_address)(void);
+} backend_def;
+*/
