@@ -5,6 +5,8 @@ void p_read_lvalue(lvalue_def *lvalue, variable_def *var, block_def *parent, int
 		   il_op prefix_op);
 void p_read_expression(int param_no, block_def *parent);
 void p_read_code_block(function_def *function, block_def *parent);
+int p_read_parameter_list_declaration(variable_def vds[], int anon);
+void p_read_function_parameters(block_def *parent);
 
 int p_write_symbol(char *data, int len)
 {
@@ -15,7 +17,7 @@ int p_write_symbol(char *data, int len)
 
 int p_get_size(variable_def *var, type_def *type)
 {
-	if (var->is_pointer)
+	if (var->is_pointer || var->is_function)
 		return PTR_SIZE;
 	return type->size;
 }
@@ -102,51 +104,64 @@ int p_read_numeric_constant(char buffer[])
 	return value;
 }
 
-void p_read_inner_variable_declaration(variable_def *vd)
+void p_read_inner_variable_declaration(variable_def *vd, int anon)
 {
 	if (l_accept(t_star))
 		vd->is_pointer = 1;
 	else
 		vd->is_pointer = 0;
-	l_ident(t_identifier, vd->variable_name);
-	if (l_accept(t_op_square)) {
-		char buffer[10];
 
-		/* array with size*/
-		if (l_peek(t_numeric, buffer)) {
-			vd->array_size = p_read_numeric_constant(buffer);
-			l_expect(t_numeric);
-		} else {
-			/* array without size - just a pointer although could be nested */
-			vd->is_pointer++;
-		}
-		l_expect(t_cl_square);
+	/* is it function pointer declaration? */
+	if (l_accept(t_op_bracket)) {
+		variable_def funargs[MAX_PARAMS];
+		l_expect(t_star);
+		l_ident(t_identifier, vd->variable_name);
+		l_expect(t_cl_bracket);
+		p_read_parameter_list_declaration(funargs, 1);
+		vd->is_function = 1;
 	} else {
-		vd->array_size = 0;
+		if (anon == 0) {
+			l_ident(t_identifier, vd->variable_name);
+		}
+		if (l_accept(t_op_square)) {
+			char buffer[10];
+
+			/* array with size*/
+			if (l_peek(t_numeric, buffer)) {
+				vd->array_size = p_read_numeric_constant(buffer);
+				l_expect(t_numeric);
+			} else {
+				/* array without size - just a pointer although could be nested */
+				vd->is_pointer++;
+			}
+			l_expect(t_cl_square);
+		} else {
+			vd->array_size = 0;
+		}
 	}
 }
 
 /* we are starting it _l_next_token, need to check the type */
-void p_read_full_variable_declaration(variable_def *vd)
+void p_read_full_variable_declaration(variable_def *vd, int anon)
 {
 	l_accept(t_struct); /* ignore struct def */
 	l_ident(t_identifier, vd->type_name);
-	p_read_inner_variable_declaration(vd);
+	p_read_inner_variable_declaration(vd, anon);
 }
 
 /* we are starting it _l_next_token, need to check the type */
 void p_read_partial_variable_declaration(variable_def *vd, variable_def *template)
 {
 	strcpy(vd->type_name, template->type_name);
-	p_read_inner_variable_declaration(vd);
+	p_read_inner_variable_declaration(vd, 0);
 }
 
-int p_read_parameter_list_declaration(variable_def vds[])
+int p_read_parameter_list_declaration(variable_def vds[], int anon)
 {
 	int vn = 0;
 	l_expect(t_op_bracket);
 	while (l_peek(t_identifier, NULL) == 1) {
-		p_read_full_variable_declaration(&vds[vn++]);
+		p_read_full_variable_declaration(&vds[vn++], anon);
 		l_accept(t_comma);
 	}
 	if (l_accept(t_elipsis)) {
@@ -335,6 +350,37 @@ void p_read_expression_operand(int param_no, block_def *parent)
 			/* evalue lvalue expression */
 			lvalue_def lvalue;
 			p_read_lvalue(&lvalue, var, parent, param_no, 1, prefix_op);
+			/* is it a function pointer call? */
+			if (l_peek(t_op_bracket, NULL)) {
+				il_instr *ii;
+
+				/* preserve existing paremeters */
+				int pn;
+				for (pn = 0; pn < param_no; pn++) {
+					ii = add_instr(op_push);
+					ii->param_no = pn;
+				}
+
+				/* remember address on stack */
+				ii = add_instr(op_push);
+				ii->param_no = param_no;
+
+				p_read_function_parameters(parent);
+
+				/* retrieve address from stack into last parameter */
+				ii = add_instr(op_pop);
+				ii->param_no = MAX_PARAMS - 1;
+
+				ii = add_instr(op_pointer_call);
+				ii->int_param1 = MAX_PARAMS - 1; /* register with address */
+				ii->param_no = param_no; /* return value here */
+
+				/* restore existing parameters */
+				for (pn = param_no - 1; pn >= 0; pn--) {
+					ii = add_instr(op_pop);
+					ii->param_no = pn;
+				}
+			}
 		} else if (fn != NULL) {
 			il_instr *ii;
 			int pn;
@@ -544,10 +590,18 @@ void p_read_function_call(function_def *fn, int param_no, block_def *parent)
 
 	/* we already have function name in fn */
 	l_expect(t_identifier);
-	p_read_function_parameters(parent);
-	ii = add_instr(op_function_call);
-	ii->string_param1 = fn->return_def.variable_name;
-	ii->param_no = param_no; /* return value here */
+	if (l_peek(t_op_bracket, NULL)) {
+		/* function call */
+		p_read_function_parameters(parent);
+		ii = add_instr(op_function_call);
+		ii->string_param1 = fn->return_def.variable_name;
+		ii->param_no = param_no; /* return value here */
+	} else {
+		/* function pointer */
+		ii = add_instr(op_get_var_addr);
+		ii->string_param1 = fn->return_def.variable_name;
+		ii->param_no = param_no; /* return value here */
+	}
 }
 
 /* returns address an expression points to, or evaluates its value */
@@ -1120,7 +1174,7 @@ void p_read_body_statement(block_def *parent)
 	type = find_type(token);
 	if (type != NULL) {
 		var = &parent->locals[parent->next_local++];
-		p_read_full_variable_declaration(var);
+		p_read_full_variable_declaration(var, 0);
 		if (l_accept(t_assign)) {
 			p_read_expression(1, parent); /* get expression value into a1 */
 			/* assign a0 to our new variable */
@@ -1212,7 +1266,7 @@ void p_read_function_body(function_def *fdef)
 void p_read_global_declaration(block_def *block)
 {
 	/* new function, or variables under parent */
-	p_read_full_variable_declaration(_temp_variable);
+	p_read_full_variable_declaration(_temp_variable, 0);
 
 	if (l_peek(t_op_bracket, NULL)) {
 		function_def *fd;
@@ -1222,7 +1276,7 @@ void p_read_global_declaration(block_def *block)
 		fd = add_function(_temp_variable->variable_name);
 		memcpy(&fd->return_def, _temp_variable, sizeof(variable_def));
 
-		fd->num_params = p_read_parameter_list_declaration(fd->param_defs);
+		fd->num_params = p_read_parameter_list_declaration(fd->param_defs, 0);
 
 		if (l_peek(t_op_curly, NULL)) {
 			ii = add_instr(op_entry_point);
@@ -1307,7 +1361,7 @@ void p_read_global_statement()
 			l_expect(t_op_curly);
 			do {
 				variable_def *v = &type->fields[i++];
-				p_read_full_variable_declaration(v);
+				p_read_full_variable_declaration(v, 0);
 				v->offset = size;
 				size += size_variable(v);
 				l_expect(t_semicolon);

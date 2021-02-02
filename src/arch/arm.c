@@ -252,6 +252,11 @@ int a_bl(ar_cond cond, int ofs)
 	return a_encode(cond, 176, 0, 0, 0) + (o & 16777215);
 }
 
+int a_blx(ar_cond cond, a_reg rd)
+{
+	return a_encode(cond, 18, 15, 15, rd + 3888);
+}
+
 int a_mul(ar_cond cond, a_reg rd, a_reg r1, a_reg r2)
 {
 	return a_encode(cond, 0, rd, 0, (r1 << 8) + 144 + r2);

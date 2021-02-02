@@ -101,6 +101,7 @@ int c_get_code_length(il_instr *ii, arch_t arch)
 		fn = find_function(ii->string_param1);
 		return 16 + (fn->num_params << 2);
 	case op_function_call:
+	case op_pointer_call:
 		if (ii->param_no != 0)
 			return 8;
 		return 4;
@@ -288,19 +289,41 @@ void c_generate(arch_t arch)
 			} else {
 				/* need to find the variable offset on stack, i.e. from s0 */
 				var = find_local_variable(ii->string_param1, bd);
-				if (var == NULL)
-					abort(); /* not found? */
+				if (var != NULL) {
+					offset = -var->offset;
+					switch (arch) {
+					case a_arm:
+						c_emit(a_add_i(ac_al, state.dest_reg, a_s0, offset & 255));
+						c_emit(a_add_i(ac_al, state.dest_reg, state.dest_reg,
+							       offset - (offset & 255)));
+						break;
+					case a_riscv:
+						c_emit(r_addi(state.dest_reg, r_s0, 0));
+						c_emit(r_addi(state.dest_reg, state.dest_reg, offset));
+						break;
+					}
+				} else {
+					/* is it function address? */
+					fn = find_function(ii->string_param1);
+					if (fn != NULL) {
+						int jump_instr_index = fn->entry_point;
+						il_instr *jump_instr = &_il[jump_instr_index];
+						ofs = state.code_start +
+						      jump_instr->code_offset; /* load code offset into variable */
 
-				offset = -var->offset;
-				switch (arch) {
-				case a_arm:
-					c_emit(a_add_i(ac_al, state.dest_reg, a_s0, offset & 255));
-					c_emit(a_add_i(ac_al, state.dest_reg, state.dest_reg, offset - (offset & 255)));
-					break;
-				case a_riscv:
-					c_emit(r_addi(state.dest_reg, r_s0, 0));
-					c_emit(r_addi(state.dest_reg, state.dest_reg, offset));
-					break;
+						switch (arch) {
+						case a_arm:
+							c_emit(a_movw(ac_al, state.dest_reg, ofs));
+							c_emit(a_movt(ac_al, state.dest_reg, ofs));
+							break;
+						case a_riscv:
+							c_emit(r_lui(state.dest_reg, r_hi(ofs)));
+							offset = r_lo(ofs);
+							c_emit(r_addi(state.dest_reg, state.dest_reg, offset));
+							break;
+						}
+					} else
+						error("Undefined identifier");
 				}
 			}
 			printf("  x%d = &%s", state.dest_reg, ii->string_param1);
@@ -422,6 +445,22 @@ void c_generate(arch_t arch)
 				break;
 			}
 			printf("  x%d := %s() @ %d", state.dest_reg, ii->string_param1, fn->entry_point);
+		} break;
+		case op_pointer_call: {
+			/* function pointer call, address in op_reg, result in dest_reg */
+			switch (arch) {
+			case a_arm:
+				c_emit(a_blx(ac_al, state.op_reg));
+				if (state.dest_reg != a_r0)
+					c_emit(a_mov_r(ac_al, state.dest_reg, a_r0));
+				break;
+			case a_riscv:
+				c_emit(r_jalr(r_ra, state.op_reg, 0));
+				if (state.dest_reg != r_a0)
+					c_emit(r_addi(state.dest_reg, r_a0, 0));
+				break;
+			}
+			printf("  x%d := x%d()", state.dest_reg, state.op_reg);
 		} break;
 		case op_push:
 			switch (arch) {
