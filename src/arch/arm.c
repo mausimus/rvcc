@@ -371,7 +371,7 @@ void a_op_load_data_address(backend_state *state, int ofs)
 	c_emit(a_movw(ac_al, state->dest_reg, ofs));
 	c_emit(a_movt(ac_al, state->dest_reg, ofs));
 }
-/*
+
 void a_op_load_numeric_constant(backend_state *state, int val)
 {
 	if (val >= 0 && val < 256) {
@@ -380,7 +380,27 @@ void a_op_load_numeric_constant(backend_state *state, int val)
 		c_emit(a_movw(ac_al, state->dest_reg, val));
 		c_emit(a_movt(ac_al, state->dest_reg, val));
 	}
-}*/
+}
+
+void a_op_get_global_addr(backend_state *state, int ofs)
+{
+	/* need to find the variable offset in data section, absolute */
+	ofs += state->code_start;
+	c_emit(a_movw(ac_al, state->dest_reg, ofs));
+	c_emit(a_movt(ac_al, state->dest_reg, ofs));
+}
+
+void a_op_get_local_addr(backend_state *state, int offset)
+{
+	c_emit(a_add_i(ac_al, state->dest_reg, a_s0, offset & 255));
+	c_emit(a_add_i(ac_al, state->dest_reg, state->dest_reg, offset - (offset & 255)));
+}
+
+void a_op_get_function_addr(backend_state *state, int ofs)
+{
+	c_emit(a_movw(ac_al, state->dest_reg, ofs));
+	c_emit(a_movt(ac_al, state->dest_reg, ofs));
+}
 
 void a_initialize_backend(backend_def *be)
 {
@@ -391,5 +411,8 @@ void a_initialize_backend(backend_def *be)
 	be->c_dest_reg = a_dest_reg;
 	be->c_get_code_length = a_get_code_length;
 	be->op_load_data_address = a_op_load_data_address;
-	/*	be->op_load_numeric_constant = a_op_load_numeric_constant;*/
+	be->op_load_numeric_constant = a_op_load_numeric_constant;
+	be->op_get_global_addr = a_op_get_global_addr;
+	be->op_get_local_addr = a_op_get_local_addr;
+	be->op_get_function_addr = a_op_get_function_addr;
 }

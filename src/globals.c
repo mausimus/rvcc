@@ -208,7 +208,7 @@ int size_variable(variable_def *var)
 	type_def *td;
 	int bs, j, s = 0;
 
-	if (var->is_pointer > 0) {
+	if (var->is_pointer > 0 || var->is_function > 0) {
 		s += 4;
 	} else {
 		td = find_type(var->type_name);

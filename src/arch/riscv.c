@@ -477,7 +477,7 @@ void r_op_load_data_address(backend_state *state, int ofs)
 	c_emit(r_auipc(state->dest_reg, r_hi(ofs)));
 	c_emit(r_addi(state->dest_reg, state->dest_reg, r_lo(ofs)));
 }
-/*
+
 void r_op_load_numeric_constant(backend_state *state, int val)
 {
 	if (val > -2048 && val < 2047) {
@@ -487,7 +487,27 @@ void r_op_load_numeric_constant(backend_state *state, int val)
 		c_emit(r_addi(state->dest_reg, state->dest_reg, r_lo(val)));
 	}
 }
-*/
+
+void r_op_get_global_addr(backend_state *state, int ofs)
+{
+	/* need to find the variable offset in data section, from PC */
+	ofs -= state->pc;
+	c_emit(r_auipc(state->dest_reg, r_hi(ofs)));
+	c_emit(r_addi(state->dest_reg, state->dest_reg, r_lo(ofs)));
+}
+
+void r_op_get_local_addr(backend_state *state, int offset)
+{
+	c_emit(r_addi(state->dest_reg, r_s0, 0));
+	c_emit(r_addi(state->dest_reg, state->dest_reg, offset));
+}
+
+void r_op_get_function_addr(backend_state *state, int ofs)
+{
+	c_emit(r_lui(state->dest_reg, r_hi(ofs)));
+	c_emit(r_addi(state->dest_reg, state->dest_reg, r_lo(ofs)));
+}
+
 void r_initialize_backend(backend_def *be)
 {
 	be->arch = a_riscv;
@@ -497,5 +517,8 @@ void r_initialize_backend(backend_def *be)
 	be->c_dest_reg = r_dest_reg;
 	be->c_get_code_length = r_get_code_length;
 	be->op_load_data_address = r_op_load_data_address;
-	/*	be->op_load_numeric_constant = r_op_load_numeric_constant;*/
+	be->op_load_numeric_constant = r_op_load_numeric_constant;
+	be->op_get_global_addr = r_op_get_global_addr;
+	be->op_get_local_addr = r_op_get_local_addr;
+	be->op_get_function_addr = r_op_get_function_addr;
 }

@@ -184,4 +184,7 @@ typedef struct {
 	int (*c_get_code_length)(il_instr *);
 	void (*op_load_data_address)(backend_state *, int);
 	void (*op_load_numeric_constant)(backend_state *, int);
+	void (*op_get_global_addr)(backend_state *, int);
+	void (*op_get_local_addr)(backend_state *, int);
+	void (*op_get_function_addr)(backend_state *, int);
 } backend_def;

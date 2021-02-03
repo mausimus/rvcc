@@ -127,25 +127,7 @@ void c_generate(arch_t arch)
 		case op_load_numeric_constant:
 			/* load numeric constant */
 			val = ii->int_param1;
-			/*_backend->op_load_numeric_constant(&state, val);*/
-			switch (arch) {
-			case a_arm:
-				if (val >= 0 && val < 256) {
-					c_emit(a_mov_i(ac_al, state.dest_reg, val));
-				} else {
-					c_emit(a_movw(ac_al, state.dest_reg, val));
-					c_emit(a_movt(ac_al, state.dest_reg, val));
-				}
-				break;
-			case a_riscv:
-				if (val > -2048 && val < 2047) {
-					c_emit(r_addi(state.dest_reg, r_zero, r_lo(val)));
-				} else {
-					c_emit(r_lui(state.dest_reg, r_hi(val)));
-					c_emit(r_addi(state.dest_reg, state.dest_reg, r_lo(val)));
-				}
-				break;
-			}
+			_backend->op_load_numeric_constant(&state, val);
 			printf("  x%d := %d", state.dest_reg, ii->int_param1);
 			break;
 		case op_get_var_addr:
@@ -153,39 +135,13 @@ void c_generate(arch_t arch)
 			var = find_global_variable(ii->string_param1);
 			if (var != NULL) {
 				int ofs = state.data_start + var->offset;
-				switch (arch) {
-				case a_arm:
-					/* need to find the variable offset in data section, absolute */
-					ofs += state.code_start;
-
-					c_emit(a_movw(ac_al, state.dest_reg, ofs));
-					c_emit(a_movt(ac_al, state.dest_reg, ofs));
-					break;
-				case a_riscv:
-					/* need to find the variable offset in data section, from PC */
-					ofs -= state.pc;
-
-					c_emit(r_auipc(state.dest_reg, r_hi(ofs)));
-					offset = r_lo(ofs);
-					c_emit(r_addi(state.dest_reg, state.dest_reg, offset));
-					break;
-				}
+				_backend->op_get_global_addr(&state, ofs);
 			} else {
 				/* need to find the variable offset on stack, i.e. from s0 */
 				var = find_local_variable(ii->string_param1, bd);
 				if (var != NULL) {
 					offset = -var->offset;
-					switch (arch) {
-					case a_arm:
-						c_emit(a_add_i(ac_al, state.dest_reg, a_s0, offset & 255));
-						c_emit(a_add_i(ac_al, state.dest_reg, state.dest_reg,
-							       offset - (offset & 255)));
-						break;
-					case a_riscv:
-						c_emit(r_addi(state.dest_reg, r_s0, 0));
-						c_emit(r_addi(state.dest_reg, state.dest_reg, offset));
-						break;
-					}
+					_backend->op_get_local_addr(&state, offset);
 				} else {
 					/* is it function address? */
 					fn = find_function(ii->string_param1);
@@ -194,18 +150,7 @@ void c_generate(arch_t arch)
 						il_instr *jump_instr = &_il[jump_instr_index];
 						ofs = state.code_start +
 						      jump_instr->code_offset; /* load code offset into variable */
-
-						switch (arch) {
-						case a_arm:
-							c_emit(a_movw(ac_al, state.dest_reg, ofs));
-							c_emit(a_movt(ac_al, state.dest_reg, ofs));
-							break;
-						case a_riscv:
-							c_emit(r_lui(state.dest_reg, r_hi(ofs)));
-							offset = r_lo(ofs);
-							c_emit(r_addi(state.dest_reg, state.dest_reg, offset));
-							break;
-						}
+						_backend->op_get_function_addr(&state, ofs);
 					} else
 						error("Undefined identifier");
 				}
