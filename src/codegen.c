@@ -1,18 +1,5 @@
 /* rvcc C compiler - IL->binary code generator */
 
-int c_dest_reg(int param_no, arch_t arch)
-{
-	switch (arch) {
-	case a_arm:
-		return param_no;
-	case a_riscv:
-		return param_no + 10;
-	default:
-		error("Unsupported architecture");
-		return 0;
-	}
-}
-
 /* calculates stack space needed for function's parameters */
 void c_size_function(function_def *fn)
 {
@@ -89,106 +76,13 @@ void c_size_functions(int data_start)
 	}
 }
 
-/* returns expected binary length of an IL instruction in bytes */
-int c_get_code_length(il_instr *ii, arch_t arch)
-{
-	il_op op = ii->op;
-	function_def *fn;
-	block_def *bd;
-
-	switch (op) {
-	case op_entry_point:
-		fn = find_function(ii->string_param1);
-		return 16 + (fn->num_params << 2);
-	case op_function_call:
-	case op_pointer_call:
-		if (ii->param_no != 0)
-			return 8;
-		return 4;
-	case op_load_numeric_constant:
-		switch (arch) {
-		case a_arm:
-			if (ii->int_param1 >= 0 && ii->int_param1 < 256)
-				return 4;
-			else
-				return 8;
-		case a_riscv:
-			if (ii->int_param1 > -2048 && ii->int_param1 < 2047)
-				return 4;
-			else
-				return 8;
-		default:
-			error("Unsupported architecture");
-			return 0;
-		}
-	case op_block_start:
-	case op_block_end:
-		bd = &_blocks[ii->int_param1];
-		if (bd->next_local > 0)
-			return 4;
-		else
-			return 0;
-	case op_equals:
-	case op_not_equals:
-	case op_less_than:
-	case op_less_eq_than:
-	case op_greater_than:
-	case op_greater_eq_than:
-		if (arch == a_arm)
-			return 12;
-		else
-			return 16;
-	case op_syscall:
-		return 20;
-	case op_exit_point:
-		return 16;
-	case op_exit:
-		return 12;
-	case op_load_data_address:
-	case op_jz:
-	case op_jnz:
-	case op_push:
-	case op_pop:
-	case op_get_var_addr:
-	case op_start:
-		return 8;
-	case op_jump:
-	case op_return:
-	case op_generic:
-	case op_add:
-	case op_sub:
-	case op_mul:
-	case op_read_addr:
-	case op_write_addr:
-	case op_log_or:
-	case op_log_and:
-	case op_not:
-	case op_bit_or:
-	case op_bit_and:
-	case op_negate:
-	case op_bit_lshift:
-	case op_bit_rshift:
-		return 4;
-	case op_label:
-		return 0;
-	default:
-		error("Unsupported IL op");
-	}
-	return 0;
-}
-
-void c_emit(int code)
-{
-	e_write_code_int(code);
-}
-
 /* calculates total binary code length based on IL ops */
-int c_calculate_code_length(arch_t arch)
+int c_calculate_code_length()
 {
 	int code_len = 0, i;
 	for (i = 0; i < _il_idx; i++) {
 		_il[i].code_offset = code_len;
-		_il[i].op_len = c_get_code_length(&_il[i], arch);
+		_il[i].op_len = _backend->c_get_code_length(&_il[i]);
 		code_len += _il[i].op_len;
 	}
 	return code_len;
@@ -203,7 +97,7 @@ void c_generate(arch_t arch)
 
 	backend_state state;
 	state.code_start = _e_code_start; /* ELF headers size */
-	state.data_start = c_calculate_code_length(arch);
+	state.data_start = c_calculate_code_length();
 	c_size_functions(state.code_start + state.data_start);
 
 	for (i = 0; i < _il_idx; i++) {
@@ -215,8 +109,8 @@ void c_generate(arch_t arch)
 		il_instr *ii = &_il[i];
 		il_op op = ii->op;
 		state.pc = _e_code_idx;
-		state.dest_reg = c_dest_reg(ii->param_no, arch);
-		state.op_reg = c_dest_reg(ii->int_param1, arch);
+		state.dest_reg = _backend->c_dest_reg(ii->param_no);
+		state.op_reg = _backend->c_dest_reg(ii->int_param1);
 
 		/* format IL log prefix */
 		printf("%4d %3d  %#010x     ", i, op, state.code_start + state.pc);
@@ -227,23 +121,13 @@ void c_generate(arch_t arch)
 		case op_load_data_address:
 			/* lookup address of a constant in data section */
 			ofs = state.data_start + ii->int_param1;
-			switch (arch) {
-			case a_arm:
-				ofs += state.code_start;
-				c_emit(a_movw(ac_al, state.dest_reg, ofs));
-				c_emit(a_movt(ac_al, state.dest_reg, ofs));
-				break;
-			case a_riscv:
-				ofs -= state.pc;
-				c_emit(r_auipc(state.dest_reg, r_hi(ofs)));
-				c_emit(r_addi(state.dest_reg, state.dest_reg, r_lo(ofs)));
-				break;
-			}
+			_backend->op_load_data_address(&state, ofs);
 			printf("  x%d := &data[%d]", state.dest_reg, ii->int_param1);
 			break;
 		case op_load_numeric_constant:
 			/* load numeric constant */
 			val = ii->int_param1;
+			/*_backend->op_load_numeric_constant(&state, val);*/
 			switch (arch) {
 			case a_arm:
 				if (val >= 0 && val < 256) {

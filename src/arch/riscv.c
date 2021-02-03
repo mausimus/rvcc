@@ -382,3 +382,120 @@ int r_mul(r_reg rd, r_reg rs1, r_reg rs2)
 {
 	return r_encode_R(ri_mul, rd, rs1, rs2);
 }
+
+int r_elf_machine()
+{
+	return 0xf3;
+}
+
+int r_elf_flags()
+{
+	return 0x5000200;
+}
+
+int r_dest_reg(int param_no)
+{
+	return param_no + 10;
+}
+
+int r_get_code_length(il_instr *ii)
+{
+	il_op op = ii->op;
+	function_def *fn;
+	block_def *bd;
+
+	switch (op) {
+	case op_entry_point:
+		fn = find_function(ii->string_param1);
+		return 16 + (fn->num_params << 2);
+	case op_function_call:
+	case op_pointer_call:
+		if (ii->param_no != 0)
+			return 8;
+		return 4;
+	case op_load_numeric_constant:
+		if (ii->int_param1 > -2048 && ii->int_param1 < 2047)
+			return 4;
+		else
+			return 8;
+	case op_block_start:
+	case op_block_end:
+		bd = &_blocks[ii->int_param1];
+		if (bd->next_local > 0)
+			return 4;
+		else
+			return 0;
+	case op_equals:
+	case op_not_equals:
+	case op_less_than:
+	case op_less_eq_than:
+	case op_greater_than:
+	case op_greater_eq_than:
+		return 16;
+	case op_syscall:
+		return 20;
+	case op_exit_point:
+		return 16;
+	case op_exit:
+		return 12;
+	case op_load_data_address:
+	case op_jz:
+	case op_jnz:
+	case op_push:
+	case op_pop:
+	case op_get_var_addr:
+	case op_start:
+		return 8;
+	case op_jump:
+	case op_return:
+	case op_generic:
+	case op_add:
+	case op_sub:
+	case op_mul:
+	case op_read_addr:
+	case op_write_addr:
+	case op_log_or:
+	case op_log_and:
+	case op_not:
+	case op_bit_or:
+	case op_bit_and:
+	case op_negate:
+	case op_bit_lshift:
+	case op_bit_rshift:
+		return 4;
+	case op_label:
+		return 0;
+	default:
+		error("Unsupported IL op");
+	}
+	return 0;
+}
+
+void r_op_load_data_address(backend_state *state, int ofs)
+{
+	ofs -= state->pc;
+	c_emit(r_auipc(state->dest_reg, r_hi(ofs)));
+	c_emit(r_addi(state->dest_reg, state->dest_reg, r_lo(ofs)));
+}
+/*
+void r_op_load_numeric_constant(backend_state *state, int val)
+{
+	if (val > -2048 && val < 2047) {
+		c_emit(r_addi(state->dest_reg, r_zero, r_lo(val)));
+	} else {
+		c_emit(r_lui(state->dest_reg, r_hi(val)));
+		c_emit(r_addi(state->dest_reg, state->dest_reg, r_lo(val)));
+	}
+}
+*/
+void r_initialize_backend(backend_def *be)
+{
+	be->arch = a_riscv;
+	be->source_define = "__RISCV";
+	be->elf_machine = r_elf_machine;
+	be->elf_flags = r_elf_flags;
+	be->c_dest_reg = r_dest_reg;
+	be->c_get_code_length = r_get_code_length;
+	be->op_load_data_address = r_op_load_data_address;
+	/*	be->op_load_numeric_constant = r_op_load_numeric_constant;*/
+}

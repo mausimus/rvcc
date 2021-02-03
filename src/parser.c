@@ -22,7 +22,7 @@ int p_get_size(variable_def *var, type_def *type)
 	return type->size;
 }
 
-void p_initialize(arch_t arch)
+void p_initialize()
 {
 	il_instr *ii;
 	type_def *type;
@@ -45,16 +45,7 @@ void p_initialize(arch_t arch)
 	e_add_symbol("", 0, 0); /* undef symbol */
 
 	/* architecture defines */
-	switch (arch) {
-	case a_arm:
-		add_alias("__ARM", "1");
-		break;
-	case a_riscv:
-		add_alias("__RISCV", "1");
-		break;
-	default:
-		error("Unsupported architecture");
-	}
+	add_alias(_backend->source_define, "1");
 
 	/* binary entry point: read params, call main, exit */
 	ii = add_instr(op_label);
@@ -249,6 +240,38 @@ void p_read_char_param(int param_no)
 	ii->int_param1 = token[0];
 }
 
+void p_read_pointer_call(int param_no, block_def *parent)
+{
+	il_instr *ii;
+
+	/* preserve existing paremeters */
+	int pn;
+	for (pn = 0; pn < param_no; pn++) {
+		ii = add_instr(op_push);
+		ii->param_no = pn;
+	}
+
+	/* remember address on stack */
+	ii = add_instr(op_push);
+	ii->param_no = param_no;
+
+	p_read_function_parameters(parent);
+
+	/* retrieve address from stack into last parameter */
+	ii = add_instr(op_pop);
+	ii->param_no = MAX_PARAMS - 1;
+
+	ii = add_instr(op_pointer_call);
+	ii->int_param1 = MAX_PARAMS - 1; /* register with address */
+	ii->param_no = param_no; /* return value here */
+
+	/* restore existing parameters */
+	for (pn = param_no - 1; pn >= 0; pn--) {
+		ii = add_instr(op_pop);
+		ii->param_no = pn;
+	}
+}
+
 /* maintain a stack of expression values and operators,
  depending on next operators's priority either apply it or operator on stack first */
 void p_read_expression_operand(int param_no, block_def *parent)
@@ -352,34 +375,7 @@ void p_read_expression_operand(int param_no, block_def *parent)
 			p_read_lvalue(&lvalue, var, parent, param_no, 1, prefix_op);
 			/* is it a function pointer call? */
 			if (l_peek(t_op_bracket, NULL)) {
-				il_instr *ii;
-
-				/* preserve existing paremeters */
-				int pn;
-				for (pn = 0; pn < param_no; pn++) {
-					ii = add_instr(op_push);
-					ii->param_no = pn;
-				}
-
-				/* remember address on stack */
-				ii = add_instr(op_push);
-				ii->param_no = param_no;
-
-				p_read_function_parameters(parent);
-
-				/* retrieve address from stack into last parameter */
-				ii = add_instr(op_pop);
-				ii->param_no = MAX_PARAMS - 1;
-
-				ii = add_instr(op_pointer_call);
-				ii->int_param1 = MAX_PARAMS - 1; /* register with address */
-				ii->param_no = param_no; /* return value here */
-
-				/* restore existing parameters */
-				for (pn = param_no - 1; pn >= 0; pn--) {
-					ii = add_instr(op_pop);
-					ii->param_no = pn;
-				}
+				p_read_pointer_call(param_no, parent);
 			}
 		} else if (fn != NULL) {
 			il_instr *ii;
@@ -834,6 +830,14 @@ int p_read_body_assignment(char *token, block_def *parent)
 			op = op_bit_or;
 		} else if (l_accept(t_andeq)) {
 			op = op_bit_and;
+		} else if (l_peek(t_op_bracket, NULL)) {
+			/* dereference lvalue into function address */
+			ii = add_instr(op_read_addr);
+			ii->param_no = 0;
+			ii->int_param1 = 0;
+			ii->int_param2 = lvalue.size;
+			p_read_pointer_call(0, parent);
+			return 1;
 		} else {
 			l_expect(t_assign);
 		}
@@ -1395,9 +1399,9 @@ void p_read_global_statement()
 	}
 }
 
-void p_parse(arch_t arch)
+void p_parse()
 {
-	p_initialize(arch);
+	p_initialize();
 	l_initialize();
 	do {
 		p_read_global_statement();

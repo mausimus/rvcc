@@ -174,10 +174,14 @@ typedef struct {
 	int op_reg;
 	int pc;
 } backend_state;
-/*
+
 typedef struct {
-	int (*c_dest_reg)(int param_no);
-	int (*c_get_code_length)(il_instr *ii);
-	void (*op_load_data_address)(void);
+	arch_t arch;
+	char *source_define;
+	int (*elf_machine)();
+	int (*elf_flags)();
+	int (*c_dest_reg)(int);
+	int (*c_get_code_length)(il_instr *);
+	void (*op_load_data_address)(backend_state *, int);
+	void (*op_load_numeric_constant)(backend_state *, int);
 } backend_def;
-*/

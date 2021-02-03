@@ -28,6 +28,8 @@ int *_p_break_exit_il_idxs;
 
 variable_def *_temp_variable;
 
+backend_def *_backend;
+
 /* ELF sections */
 
 char *_e_code;
@@ -257,6 +259,7 @@ void g_initialize()
 	_constants = malloc(MAX_CONSTANTS * sizeof(constant_def));
 	_temp_variable = malloc(sizeof(variable_def));
 	_p_break_exit_il_idxs = malloc(MAX_NESTING * sizeof(int));
+	_backend = malloc(sizeof(backend_def));
 }
 
 void error(char *msg)

@@ -62,7 +62,12 @@ void e_write_data_byte(char val)
 	_e_data[_e_data_idx++] = val;
 }
 
-void e_generate_header(arch_t arch)
+void c_emit(int code)
+{
+	e_write_code_int(code);
+}
+
+void e_generate_header()
 {
 	/* ELF header */
 	e_write_header_int(0x464c457f); /* ELF magic */
@@ -74,14 +79,7 @@ void e_generate_header(arch_t arch)
 	e_write_header_int(0);
 	e_write_header_byte(2); /* ET_EXEC */
 	e_write_header_byte(0);
-	switch (arch) {
-	case a_arm:
-		e_write_header_byte(0x28); /* ARM */
-		break;
-	case a_riscv:
-		e_write_header_byte(0xf3); /* RISC-V */
-		break;
-	}
+	e_write_header_byte(_backend->elf_machine());
 	e_write_header_byte(0);
 	e_write_header_int(1); /* ELF version */
 	e_write_header_int(ELF_START + _e_header_len); /* entry point */
@@ -89,14 +87,7 @@ void e_generate_header(arch_t arch)
 	e_write_header_int(_e_header_len + _e_code_idx + _e_data_idx + 39 + _e_symtab_idx +
 			   _e_strtab_idx); /* section header offset */
 	/* flags */
-	switch (arch) {
-	case a_arm:
-		e_write_header_int(0x5000200);
-		break;
-	case a_riscv:
-		e_write_header_int(0);
-		break;
-	}
+	e_write_header_int(_backend->elf_flags());
 	e_write_header_byte(0x34); /* header size */
 	e_write_header_byte(0);
 	e_write_header_byte(0x20); /* program header size */
@@ -271,10 +262,10 @@ void e_output(char *outfile)
 	fclose(fp);
 }
 
-void e_generate(char *outfile, arch_t arch)
+void e_generate(char *outfile)
 {
 	e_align();
-	e_generate_header(arch);
+	e_generate_header();
 	e_generate_footer();
 	e_output(outfile);
 }

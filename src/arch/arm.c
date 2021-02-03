@@ -276,3 +276,120 @@ int a_teq(a_reg rd)
 {
 	return a_mov(ac_al, 1, ar_teq, 1, rd, 0, 0);
 }
+
+int a_elf_machine()
+{
+	return 0x28;
+}
+
+int a_elf_flags()
+{
+	return 0x5000200;
+}
+
+int a_dest_reg(int param_no)
+{
+	return param_no;
+}
+
+int a_get_code_length(il_instr *ii)
+{
+	il_op op = ii->op;
+	function_def *fn;
+	block_def *bd;
+
+	switch (op) {
+	case op_entry_point:
+		fn = find_function(ii->string_param1);
+		return 16 + (fn->num_params << 2);
+	case op_function_call:
+	case op_pointer_call:
+		if (ii->param_no != 0)
+			return 8;
+		return 4;
+	case op_load_numeric_constant:
+		if (ii->int_param1 >= 0 && ii->int_param1 < 256)
+			return 4;
+		else
+			return 8;
+	case op_block_start:
+	case op_block_end:
+		bd = &_blocks[ii->int_param1];
+		if (bd->next_local > 0)
+			return 4;
+		else
+			return 0;
+	case op_equals:
+	case op_not_equals:
+	case op_less_than:
+	case op_less_eq_than:
+	case op_greater_than:
+	case op_greater_eq_than:
+		return 12;
+	case op_syscall:
+		return 20;
+	case op_exit_point:
+		return 16;
+	case op_exit:
+		return 12;
+	case op_load_data_address:
+	case op_jz:
+	case op_jnz:
+	case op_push:
+	case op_pop:
+	case op_get_var_addr:
+	case op_start:
+		return 8;
+	case op_jump:
+	case op_return:
+	case op_generic:
+	case op_add:
+	case op_sub:
+	case op_mul:
+	case op_read_addr:
+	case op_write_addr:
+	case op_log_or:
+	case op_log_and:
+	case op_not:
+	case op_bit_or:
+	case op_bit_and:
+	case op_negate:
+	case op_bit_lshift:
+	case op_bit_rshift:
+		return 4;
+	case op_label:
+		return 0;
+	default:
+		error("Unsupported IL op");
+	}
+	return 0;
+}
+
+void a_op_load_data_address(backend_state *state, int ofs)
+{
+	ofs += state->code_start;
+	c_emit(a_movw(ac_al, state->dest_reg, ofs));
+	c_emit(a_movt(ac_al, state->dest_reg, ofs));
+}
+/*
+void a_op_load_numeric_constant(backend_state *state, int val)
+{
+	if (val >= 0 && val < 256) {
+		c_emit(a_mov_i(ac_al, state->dest_reg, val));
+	} else {
+		c_emit(a_movw(ac_al, state->dest_reg, val));
+		c_emit(a_movt(ac_al, state->dest_reg, val));
+	}
+}*/
+
+void a_initialize_backend(backend_def *be)
+{
+	be->arch = a_arm;
+	be->source_define = "__ARM";
+	be->elf_machine = a_elf_machine;
+	be->elf_flags = a_elf_flags;
+	be->c_dest_reg = a_dest_reg;
+	be->c_get_code_length = a_get_code_length;
+	be->op_load_data_address = a_op_load_data_address;
+	/*	be->op_load_numeric_constant = a_op_load_numeric_constant;*/
+}

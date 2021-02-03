@@ -62,8 +62,20 @@ int main(int argc, char *argv[])
 
 	printf("Loaded %d source bytes\n", _source_idx);
 
+	switch (arch) {
+	case a_arm:
+		a_initialize_backend(_backend);
+		break;
+	case a_riscv:
+		r_initialize_backend(_backend);
+		break;
+	default:
+		printf("Unsupported architecture!\n");
+		return -1;
+	}
+
 	/* parse source into IL */
-	p_parse(arch);
+	p_parse();
 
 	printf("Parsed into %d IL instructions\n", _il_idx);
 
@@ -73,7 +85,7 @@ int main(int argc, char *argv[])
 	printf("Compiled into %d code bytes and %d data bytes\n", _e_code_idx, _e_data_idx);
 
 	/* output code in ELF */
-	e_generate(outfile, arch);
+	e_generate(outfile);
 
 	return 0;
 }
