@@ -8,7 +8,7 @@
 #define MAX_TYPE_LEN 64
 #define MAX_PARAMS 8
 #define MAX_LOCALS 64
-#define MAX_FIELDS 32
+#define MAX_FIELDS 64
 #define MAX_FUNCTIONS 1024
 #define MAX_BLOCKS 1048576
 #define MAX_TYPES 64
@@ -187,4 +187,24 @@ typedef struct {
 	void (*op_get_global_addr)(backend_state *, int);
 	void (*op_get_local_addr)(backend_state *, int);
 	void (*op_get_function_addr)(backend_state *, int);
+	void (*op_read_addr)(backend_state *, int);
+	void (*op_write_addr)(backend_state *, int);
+	void (*op_jump)(int);
+	void (*op_return)(int);
+	void (*op_function_call)(backend_state *, int);
+	void (*op_pointer_call)(backend_state *);
+	void (*op_push)(backend_state *);
+	void (*op_pop)(backend_state *);
+	void (*op_exit_point)();
+	void (*op_alu)(backend_state *, il_op);
+	void (*op_cmp)(backend_state *, il_op);
+	void (*op_log)(backend_state *, il_op);
+	void (*op_bit)(backend_state *, il_op);
+	void (*op_jz)(backend_state *, il_op, int);
+	void (*op_block)(int);
+	void (*op_entry_point)(int);
+	void (*op_store_param)(int, int);
+	void (*op_start)();
+	void (*op_syscall)();
+	void (*op_exit)();
 } backend_def;

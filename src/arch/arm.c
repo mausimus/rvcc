@@ -402,6 +402,195 @@ void a_op_get_function_addr(backend_state *state, int ofs)
 	c_emit(a_movt(ac_al, state->dest_reg, ofs));
 }
 
+void a_op_read_addr(backend_state *state, int len)
+{
+	switch (len) {
+	case 4:
+		c_emit(a_lw(ac_al, state->dest_reg, state->op_reg, 0));
+		break;
+	case 1:
+		c_emit(a_lb(ac_al, state->dest_reg, state->op_reg, 0));
+		break;
+	default:
+		error("Unsupported word size");
+	}
+}
+
+void a_op_write_addr(backend_state *state, int len)
+{
+	switch (len) {
+	case 4:
+		c_emit(a_sw(ac_al, state->dest_reg, state->op_reg, 0));
+		break;
+	case 1:
+		c_emit(a_sb(ac_al, state->dest_reg, state->op_reg, 0));
+		break;
+	default:
+		error("Unsupported word size");
+	}
+}
+
+void a_op_jump(int ofs)
+{
+	c_emit(a_b(ac_al, ofs));
+}
+
+void a_op_return(int ofs)
+{
+	c_emit(a_b(ac_al, ofs));
+}
+
+void a_op_function_call(backend_state *state, int ofs)
+{
+	c_emit(a_bl(ac_al, ofs));
+	if (state->dest_reg != a_r0)
+		c_emit(a_mov_r(ac_al, state->dest_reg, a_r0));
+}
+
+void a_op_pointer_call(backend_state *state)
+{
+	c_emit(a_blx(ac_al, state->op_reg));
+	if (state->dest_reg != a_r0)
+		c_emit(a_mov_r(ac_al, state->dest_reg, a_r0));
+}
+
+void a_op_push(backend_state *state)
+{
+	c_emit(a_add_i(ac_al, a_sp, a_sp, -16)); /* 16 aligned although we only need 4 */
+	c_emit(a_sw(ac_al, state->dest_reg, a_sp, 0));
+}
+
+void a_op_pop(backend_state *state)
+{
+	c_emit(a_lw(ac_al, state->dest_reg, a_sp, 0));
+	c_emit(a_add_i(ac_al, a_sp, a_sp, 16)); /* 16 aligned although we only need 4 */
+}
+
+void a_op_exit_point()
+{
+	c_emit(a_add_i(ac_al, a_sp, a_s0, 16));
+	c_emit(a_lw(ac_al, a_lr, a_sp, -8));
+	c_emit(a_lw(ac_al, a_s0, a_sp, -4));
+	c_emit(a_mov_r(ac_al, a_pc, a_lr));
+}
+
+void a_op_alu(backend_state *state, il_op op)
+{
+	switch (op) {
+	case op_add:
+		c_emit(a_add_r(ac_al, state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_sub:
+		c_emit(a_sub_r(ac_al, state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_mul:
+		c_emit(a_mul(ac_al, state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_negate:
+		c_emit(a_rsb_i(ac_al, state->dest_reg, 0, state->dest_reg));
+		break;
+	default:
+		break;
+	}
+}
+
+void a_op_cmp(backend_state *state, il_op op)
+{
+	ar_cond cond = a_get_cond(op);
+	c_emit(a_cmp_r(ac_al, state->dest_reg, state->dest_reg, state->op_reg));
+	c_emit(a_zero(state->dest_reg));
+	c_emit(a_mov_i(cond, state->dest_reg, 1));
+}
+
+void a_op_log(backend_state *state, il_op op)
+{
+	switch (op) {
+	case op_log_and:
+		/* we assume both have to be 1, they can't be just nonzero */
+		c_emit(a_and_r(ac_al, state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_log_or:
+		c_emit(a_or_r(ac_al, state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	default:
+		break;
+	}
+}
+
+void a_op_bit(backend_state *state, il_op op)
+{
+	switch (op) {
+	case op_bit_and:
+		c_emit(a_and_r(ac_al, state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_bit_or:
+		c_emit(a_or_r(ac_al, state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_bit_lshift:
+		c_emit(a_sll(ac_al, state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_bit_rshift:
+		c_emit(a_srl(ac_al, state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_not:
+		/* only works for 1/0 */
+		c_emit(a_rsb_i(ac_al, state->dest_reg, 1, state->dest_reg));
+		break;
+	default:
+		break;
+	}
+}
+
+void a_op_jz(backend_state *state, il_op op, int ofs)
+{
+	c_emit(a_teq(state->dest_reg));
+	if (op == op_jz) {
+		c_emit(a_b(ac_eq, ofs));
+	} else {
+		c_emit(a_b(ac_ne, ofs));
+	}
+}
+
+void a_op_block(int len)
+{
+	c_emit(a_add_i(ac_al, a_sp, a_sp, len));
+}
+
+void a_op_entry_point(int len)
+{
+	c_emit(a_add_i(ac_al, a_sp, a_sp, -16 - len));
+	c_emit(a_sw(ac_al, a_s0, a_sp, 12 + len));
+	c_emit(a_sw(ac_al, a_lr, a_sp, 8 + len));
+	c_emit(a_add_i(ac_al, a_s0, a_sp, len));
+}
+
+void a_op_store_param(int pn, int ofs)
+{
+	c_emit(a_sw(ac_al, a_r0 + pn, a_s0, ofs));
+}
+
+void a_op_start()
+{
+	c_emit(a_lw(ac_al, a_r0, a_sp, 0)); /* argc */
+	c_emit(a_add_i(ac_al, a_r1, a_sp, 4)); /* argv */
+}
+
+void a_op_syscall()
+{
+	c_emit(a_mov_r(ac_al, a_r7, a_r0));
+	c_emit(a_mov_r(ac_al, a_r0, a_r1));
+	c_emit(a_mov_r(ac_al, a_r1, a_r2));
+	c_emit(a_mov_r(ac_al, a_r2, a_r3));
+	c_emit(a_swi());
+}
+
+void a_op_exit()
+{
+	c_emit(a_mov_i(ac_al, a_r0, 0));
+	c_emit(a_mov_i(ac_al, a_r7, 1));
+	c_emit(a_swi());
+}
+
 void a_initialize_backend(backend_def *be)
 {
 	be->arch = a_arm;
@@ -415,4 +604,24 @@ void a_initialize_backend(backend_def *be)
 	be->op_get_global_addr = a_op_get_global_addr;
 	be->op_get_local_addr = a_op_get_local_addr;
 	be->op_get_function_addr = a_op_get_function_addr;
+	be->op_read_addr = a_op_read_addr;
+	be->op_write_addr = a_op_write_addr;
+	be->op_jump = a_op_jump;
+	be->op_return = a_op_return;
+	be->op_function_call = a_op_function_call;
+	be->op_pointer_call = a_op_pointer_call;
+	be->op_push = a_op_push;
+	be->op_pop = a_op_pop;
+	be->op_exit_point = a_op_exit_point;
+	be->op_alu = a_op_alu;
+	be->op_cmp = a_op_cmp;
+	be->op_log = a_op_log;
+	be->op_bit = a_op_bit;
+	be->op_jz = a_op_jz;
+	be->op_block = a_op_block;
+	be->op_entry_point = a_op_entry_point;
+	be->op_store_param = a_op_store_param;
+	be->op_start = a_op_start;
+	be->op_syscall = a_op_syscall;
+	be->op_exit = a_op_exit;
 }

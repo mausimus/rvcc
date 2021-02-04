@@ -508,6 +508,230 @@ void r_op_get_function_addr(backend_state *state, int ofs)
 	c_emit(r_addi(state->dest_reg, state->dest_reg, r_lo(ofs)));
 }
 
+void r_op_read_addr(backend_state *state, int len)
+{
+	switch (len) {
+	case 4:
+		c_emit(r_lw(state->dest_reg, state->op_reg, 0));
+		break;
+	case 1:
+		c_emit(r_lb(state->dest_reg, state->op_reg, 0));
+		break;
+	default:
+		error("Unsupported word size");
+	}
+}
+
+void r_op_write_addr(backend_state *state, int len)
+{
+	switch (len) {
+	case 4:
+		c_emit(r_sw(state->dest_reg, state->op_reg, 0));
+		break;
+	case 1:
+		c_emit(r_sb(state->dest_reg, state->op_reg, 0));
+		break;
+	default:
+		error("Unsupported word size");
+	}
+}
+
+void r_op_jump(int ofs)
+{
+	c_emit(r_jal(r_zero, ofs));
+}
+
+void r_op_return(int ofs)
+{
+	c_emit(r_jal(r_zero, ofs));
+}
+
+void r_op_function_call(backend_state *state, int ofs)
+{
+	c_emit(r_jal(r_ra, ofs));
+	if (state->dest_reg != r_a0)
+		c_emit(r_addi(state->dest_reg, r_a0, 0));
+}
+
+void r_op_pointer_call(backend_state *state)
+{
+	c_emit(r_jalr(r_ra, state->op_reg, 0));
+	if (state->dest_reg != r_a0)
+		c_emit(r_addi(state->dest_reg, r_a0, 0));
+}
+
+void r_op_push(backend_state *state)
+{
+	c_emit(r_addi(r_sp, r_sp, -16)); /* 16 aligned although we only need 4 */
+	c_emit(r_sw(state->dest_reg, r_sp, 0));
+}
+
+void r_op_pop(backend_state *state)
+{
+	c_emit(r_lw(state->dest_reg, r_sp, 0));
+	c_emit(r_addi(r_sp, r_sp, 16)); /* 16 aligned although we only need 4 */
+}
+
+void r_op_exit_point()
+{
+	c_emit(r_addi(r_sp, r_s0, 16));
+	c_emit(r_lw(r_ra, r_sp, -8));
+	c_emit(r_lw(r_s0, r_sp, -4));
+	c_emit(r_jalr(r_zero, r_ra, 0));
+}
+
+void r_op_alu(backend_state *state, il_op op)
+{
+	switch (op) {
+	case op_add:
+		c_emit(r_add(state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_sub:
+		c_emit(r_sub(state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_mul:
+		c_emit(r_mul(state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_negate:
+		c_emit(r_sub(state->dest_reg, r_zero, state->dest_reg));
+		break;
+	default:
+		break;
+	}
+}
+
+void r_op_cmp(backend_state *state, il_op op)
+{
+	switch (op) {
+	case op_equals:
+		c_emit(r_beq(state->dest_reg, state->op_reg, 12));
+		break;
+	case op_not_equals:
+		c_emit(r_bne(state->dest_reg, state->op_reg, 12));
+		break;
+	case op_less_than:
+		c_emit(r_blt(state->dest_reg, state->op_reg, 12));
+		break;
+	case op_greater_eq_than:
+		c_emit(r_bge(state->dest_reg, state->op_reg, 12));
+		break;
+	case op_greater_than:
+		c_emit(r_blt(state->op_reg, state->dest_reg, 12));
+		break;
+	case op_less_eq_than:
+		c_emit(r_bge(state->op_reg, state->dest_reg, 12));
+		break;
+	default:
+		error("Unsupported conditional IL op");
+		break;
+	}
+	c_emit(r_addi(state->dest_reg, r_zero, 0));
+	c_emit(r_jal(r_zero, 8));
+	c_emit(r_addi(state->dest_reg, r_zero, 1));
+}
+
+void r_op_log(backend_state *state, il_op op)
+{
+	switch (op) {
+	case op_log_and:
+		/* we assume both have to be 1, they can't be just nonzero */
+		c_emit(r_and(state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_log_or:
+		c_emit(r_or(state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	default:
+		break;
+	}
+}
+
+void r_op_bit(backend_state *state, il_op op)
+{
+	switch (op) {
+	case op_bit_and:
+		c_emit(r_and(state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_bit_or:
+		c_emit(r_or(state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_bit_lshift:
+		c_emit(r_sll(state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_bit_rshift:
+		c_emit(r_srl(state->dest_reg, state->dest_reg, state->op_reg));
+		break;
+	case op_not:
+		/* only works for small range integers */
+		c_emit(r_sltiu(state->dest_reg, state->dest_reg, 1));
+		break;
+	default:
+		break;
+	}
+}
+
+void r_op_jz(backend_state *state, il_op op, int ofs)
+{
+	if (ofs >= -4096 && ofs <= 4095) {
+		/* near jump (branch) */
+		if (op == op_jz) {
+			c_emit(r_nop());
+			c_emit(r_beq(state->dest_reg, r_zero, ofs));
+		} else if (op == op_jnz) {
+			c_emit(r_nop());
+			c_emit(r_bne(state->dest_reg, r_zero, ofs));
+		}
+	} else {
+		/* far jump */
+		if (op == op_jz) {
+			c_emit(r_bne(state->dest_reg, r_zero, 8)); /* skip next instruction */
+			c_emit(r_jal(r_zero, ofs));
+		} else if (op == op_jnz) {
+			c_emit(r_beq(state->dest_reg, r_zero, 8));
+			c_emit(r_jal(r_zero, ofs));
+		}
+	}
+}
+
+void r_op_block(int len)
+{
+	c_emit(r_addi(r_sp, r_sp, len));
+}
+
+void r_op_entry_point(int len)
+{
+	c_emit(r_addi(r_sp, r_sp, -16 - len));
+	c_emit(r_sw(r_s0, r_sp, 12 + len));
+	c_emit(r_sw(r_ra, r_sp, 8 + len));
+	c_emit(r_addi(r_s0, r_sp, len));
+}
+
+void r_op_store_param(int pn, int ofs)
+{
+	c_emit(r_sw(r_a0 + pn, r_s0, ofs));
+}
+
+void r_op_start()
+{
+	c_emit(r_lw(r_a0, r_sp, 0)); /* argc */
+	c_emit(r_addi(r_a1, r_sp, 4)); /* argv */
+}
+
+void r_op_syscall()
+{
+	c_emit(r_addi(r_a7, r_a0, 0));
+	c_emit(r_addi(r_a0, r_a1, 0));
+	c_emit(r_addi(r_a1, r_a2, 0));
+	c_emit(r_addi(r_a2, r_a3, 0));
+	c_emit(r_ecall());
+}
+
+void r_op_exit()
+{
+	c_emit(r_addi(r_a0, r_zero, 0));
+	c_emit(r_addi(r_a7, r_zero, 93));
+	c_emit(r_ecall());
+}
+
 void r_initialize_backend(backend_def *be)
 {
 	be->arch = a_riscv;
@@ -521,4 +745,24 @@ void r_initialize_backend(backend_def *be)
 	be->op_get_global_addr = r_op_get_global_addr;
 	be->op_get_local_addr = r_op_get_local_addr;
 	be->op_get_function_addr = r_op_get_function_addr;
+	be->op_read_addr = r_op_read_addr;
+	be->op_write_addr = r_op_write_addr;
+	be->op_jump = r_op_jump;
+	be->op_return = r_op_return;
+	be->op_function_call = r_op_function_call;
+	be->op_pointer_call = r_op_pointer_call;
+	be->op_push = r_op_push;
+	be->op_pop = r_op_pop;
+	be->op_exit_point = r_op_exit_point;
+	be->op_alu = r_op_alu;
+	be->op_cmp = r_op_cmp;
+	be->op_log = r_op_log;
+	be->op_bit = r_op_bit;
+	be->op_jz = r_op_jz;
+	be->op_block = r_op_block;
+	be->op_entry_point = r_op_entry_point;
+	be->op_store_param = r_op_store_param;
+	be->op_start = r_op_start;
+	be->op_syscall = r_op_syscall;
+	be->op_exit = r_op_exit;
 }

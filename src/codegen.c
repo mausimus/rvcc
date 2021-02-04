@@ -89,7 +89,7 @@ int c_calculate_code_length()
 }
 
 /* main code generation loop */
-void c_generate(arch_t arch)
+void c_generate()
 {
 	int i;
 	int stack_size = 0;
@@ -159,58 +159,12 @@ void c_generate(arch_t arch)
 			break;
 		case op_read_addr:
 			/* read (dereference) memory address */
-			switch (ii->int_param2) {
-			case 4:
-				switch (arch) {
-				case a_arm:
-					c_emit(a_lw(ac_al, state.dest_reg, state.op_reg, 0));
-					break;
-				case a_riscv:
-					c_emit(r_lw(state.dest_reg, state.op_reg, 0));
-					break;
-				}
-				break;
-			case 1:
-				switch (arch) {
-				case a_arm:
-					c_emit(a_lb(ac_al, state.dest_reg, state.op_reg, 0));
-					break;
-				case a_riscv:
-					c_emit(r_lb(state.dest_reg, state.op_reg, 0));
-					break;
-				}
-				break;
-			default:
-				error("Unsupported word size");
-			}
+			_backend->op_read_addr(&state, ii->int_param2);
 			printf("  x%d = *x%d (%d)", state.dest_reg, state.op_reg, ii->int_param2);
 			break;
 		case op_write_addr:
 			/* write at memory address */
-			switch (ii->int_param2) {
-			case 4:
-				switch (arch) {
-				case a_arm:
-					c_emit(a_sw(ac_al, state.dest_reg, state.op_reg, 0));
-					break;
-				case a_riscv:
-					c_emit(r_sw(state.dest_reg, state.op_reg, 0));
-					break;
-				}
-				break;
-			case 1:
-				switch (arch) {
-				case a_arm:
-					c_emit(a_sb(ac_al, state.dest_reg, state.op_reg, 0));
-					break;
-				case a_riscv:
-					c_emit(r_sb(state.dest_reg, state.op_reg, 0));
-					break;
-				}
-				break;
-			default:
-				error("Unsupported word size");
-			}
+			_backend->op_write_addr(&state, ii->int_param2);
 			printf("  *x%d = x%d (%d)", state.op_reg, state.dest_reg, ii->int_param2);
 			break;
 		case op_jump: {
@@ -219,15 +173,7 @@ void c_generate(arch_t arch)
 			il_instr *jump_instr = &_il[jump_instr_index];
 			int jump_location = jump_instr->code_offset;
 			ofs = jump_location - state.pc;
-
-			switch (arch) {
-			case a_arm:
-				c_emit(a_b(ac_al, ofs));
-				break;
-			case a_riscv:
-				c_emit(r_jal(r_zero, ofs));
-				break;
-			}
+			_backend->op_jump(ofs);
 			printf("  -> %d", ii->int_param1);
 		} break;
 		case op_return: {
@@ -237,15 +183,7 @@ void c_generate(arch_t arch)
 			il_instr *jump_instr = &_il[jump_instr_index];
 			int jump_location = jump_instr->code_offset;
 			ofs = jump_location - state.pc;
-
-			switch (arch) {
-			case a_arm:
-				c_emit(a_b(ac_al, ofs));
-				break;
-			case a_riscv:
-				c_emit(r_jal(r_zero, ofs));
-				break;
-			}
+			_backend->op_return(ofs);
 			printf("  return %s", ii->string_param1);
 		} break;
 		case op_function_call: {
@@ -261,124 +199,42 @@ void c_generate(arch_t arch)
 			jump_location = jump_instr->code_offset;
 			ofs = jump_location - state.pc;
 
-			switch (arch) {
-			case a_arm:
-				c_emit(a_bl(ac_al, ofs));
-				if (state.dest_reg != a_r0)
-					c_emit(a_mov_r(ac_al, state.dest_reg, a_r0));
-				break;
-			case a_riscv:
-				c_emit(r_jal(r_ra, ofs));
-				if (state.dest_reg != r_a0)
-					c_emit(r_addi(state.dest_reg, r_a0, 0));
-				break;
-			}
+			_backend->op_function_call(&state, ofs);
 			printf("  x%d := %s() @ %d", state.dest_reg, ii->string_param1, fn->entry_point);
 		} break;
 		case op_pointer_call: {
 			/* function pointer call, address in op_reg, result in dest_reg */
-			switch (arch) {
-			case a_arm:
-				c_emit(a_blx(ac_al, state.op_reg));
-				if (state.dest_reg != a_r0)
-					c_emit(a_mov_r(ac_al, state.dest_reg, a_r0));
-				break;
-			case a_riscv:
-				c_emit(r_jalr(r_ra, state.op_reg, 0));
-				if (state.dest_reg != r_a0)
-					c_emit(r_addi(state.dest_reg, r_a0, 0));
-				break;
-			}
+			_backend->op_pointer_call(&state);
 			printf("  x%d := x%d()", state.dest_reg, state.op_reg);
 		} break;
 		case op_push:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_add_i(ac_al, a_sp, a_sp, -16)); /* 16 aligned although we only need 4 */
-				c_emit(a_sw(ac_al, state.dest_reg, a_sp, 0));
-				break;
-			case a_riscv:
-				c_emit(r_addi(r_sp, r_sp, -16)); /* 16 aligned although we only need 4 */
-				c_emit(r_sw(state.dest_reg, r_sp, 0));
-				break;
-			}
+			_backend->op_push(&state);
 			printf("  push x%d", state.dest_reg);
 			break;
 		case op_pop:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_lw(ac_al, state.dest_reg, a_sp, 0));
-				c_emit(a_add_i(ac_al, a_sp, a_sp, 16)); /* 16 aligned although we only need 4 */
-				break;
-			case a_riscv:
-				c_emit(r_lw(state.dest_reg, r_sp, 0));
-				c_emit(r_addi(r_sp, r_sp, 16)); /* 16 aligned although we only need 4 */
-				break;
-			}
+			_backend->op_pop(&state);
 			printf("  pop x%d", state.dest_reg);
 			break;
 		case op_exit_point:
 			/* restore previous frame */
-			switch (arch) {
-			case a_arm:
-				c_emit(a_add_i(ac_al, a_sp, a_s0, 16));
-				c_emit(a_lw(ac_al, a_lr, a_sp, -8));
-				c_emit(a_lw(ac_al, a_s0, a_sp, -4));
-				c_emit(a_mov_r(ac_al, a_pc, a_lr));
-				break;
-			case a_riscv:
-				c_emit(r_addi(r_sp, r_s0, 16));
-				c_emit(r_lw(r_ra, r_sp, -8));
-				c_emit(r_lw(r_s0, r_sp, -4));
-				c_emit(r_jalr(r_zero, r_ra, 0));
-				break;
-			}
+			_backend->op_exit_point();
 			fn = NULL;
 			printf("  exit %s", ii->string_param1);
 			break;
 		case op_add:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_add_r(ac_al, state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			case a_riscv:
-				c_emit(r_add(state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			}
-
+			_backend->op_alu(&state, op_add);
 			printf("  x%d += x%d", state.dest_reg, state.op_reg);
 			break;
 		case op_sub:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_sub_r(ac_al, state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			case a_riscv:
-				c_emit(r_sub(state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			}
+			_backend->op_alu(&state, op_sub);
 			printf("  x%d -= x%d", state.dest_reg, state.op_reg);
 			break;
 		case op_mul:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_mul(ac_al, state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			case a_riscv:
-				c_emit(r_mul(state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			}
+			_backend->op_alu(&state, op_mul);
 			printf("  x%d *= x%d", state.dest_reg, state.op_reg);
 			break;
 		case op_negate:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_rsb_i(ac_al, state.dest_reg, 0, state.dest_reg));
-				break;
-			case a_riscv:
-				c_emit(r_sub(state.dest_reg, r_zero, state.dest_reg));
-				break;
-			}
+			_backend->op_alu(&state, op_negate);
 			printf("  -x%d", state.dest_reg);
 			break;
 		case op_label:
@@ -396,43 +252,7 @@ void c_generate(arch_t arch)
 		case op_greater_than:
 		case op_greater_eq_than:
 			/* we want 1/nonzero if equ, 0 otherwise */
-			switch (arch) {
-			case a_arm: {
-				ar_cond cond = a_get_cond(op);
-				c_emit(a_cmp_r(ac_al, state.dest_reg, state.dest_reg, state.op_reg));
-				c_emit(a_zero(state.dest_reg));
-				c_emit(a_mov_i(cond, state.dest_reg, 1));
-			} break;
-			case a_riscv:
-				switch (op) {
-				case op_equals:
-					c_emit(r_beq(state.dest_reg, state.op_reg, 12));
-					break;
-				case op_not_equals:
-					c_emit(r_bne(state.dest_reg, state.op_reg, 12));
-					break;
-				case op_less_than:
-					c_emit(r_blt(state.dest_reg, state.op_reg, 12));
-					break;
-				case op_greater_eq_than:
-					c_emit(r_bge(state.dest_reg, state.op_reg, 12));
-					break;
-				case op_greater_than:
-					c_emit(r_blt(state.op_reg, state.dest_reg, 12));
-					break;
-				case op_less_eq_than:
-					c_emit(r_bge(state.op_reg, state.dest_reg, 12));
-					break;
-				default:
-					error("Unsupported conditional IL op");
-					break;
-				}
-				c_emit(r_addi(state.dest_reg, r_zero, 0));
-				c_emit(r_jal(r_zero, 8));
-				c_emit(r_addi(state.dest_reg, r_zero, 1));
-				break;
-			}
-
+			_backend->op_cmp(&state, op);
 			switch (op) {
 			case op_equals:
 				printf("  x%d == x%d ?", state.dest_reg, state.op_reg);
@@ -457,85 +277,32 @@ void c_generate(arch_t arch)
 			}
 			break;
 		case op_log_and:
-			/* we assume both have to be 1, they can't be just nonzero */
-			switch (arch) {
-			case a_arm:
-				c_emit(a_and_r(ac_al, state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			case a_riscv:
-				c_emit(r_and(state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			}
+			_backend->op_log(&state, op);
 			printf("  x%d &&= x%d", state.dest_reg, state.op_reg);
 			break;
 		case op_log_or:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_or_r(ac_al, state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			case a_riscv:
-				c_emit(r_or(state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			}
+			_backend->op_log(&state, op);
 			printf("  x%d ||= x%d", state.dest_reg, state.op_reg);
 			break;
 		case op_bit_and:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_and_r(ac_al, state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			case a_riscv:
-				c_emit(r_and(state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			}
+			_backend->op_bit(&state, op);
 			printf("  x%d &= x%d", state.dest_reg, state.op_reg);
 			break;
 		case op_bit_or:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_or_r(ac_al, state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			case a_riscv:
-				c_emit(r_or(state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			}
+			_backend->op_bit(&state, op);
 			printf("  x%d |= x%d", state.dest_reg, state.op_reg);
 			break;
 		case op_bit_lshift:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_sll(ac_al, state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			case a_riscv:
-				c_emit(r_sll(state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			}
+			_backend->op_bit(&state, op);
 			printf("  x%d <<= x%d", state.dest_reg, state.op_reg);
 			break;
 		case op_bit_rshift:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_srl(ac_al, state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			case a_riscv:
-				c_emit(r_srl(state.dest_reg, state.dest_reg, state.op_reg));
-				break;
-			}
-
+			_backend->op_bit(&state, op);
 			printf("  x%d >>= x%d", state.dest_reg, state.op_reg);
 			break;
 		case op_not:
 			/* 1 if zero, 0 if nonzero */
-			switch (arch) {
-			case a_arm:
-				/* only works for 1/0 */
-				c_emit(a_rsb_i(ac_al, state.dest_reg, 1, state.dest_reg));
-				break;
-			case a_riscv:
-				/* only works for small range integers */
-				c_emit(r_sltiu(state.dest_reg, state.dest_reg, 1));
-				break;
-			}
+			_backend->op_bit(&state, op);
 			printf("  !x%d", state.dest_reg);
 			break;
 		case op_jz:
@@ -545,44 +312,11 @@ void c_generate(arch_t arch)
 			il_instr *jump_instr = &_il[jump_instr_index];
 			int jump_location = jump_instr->code_offset;
 			int ofs = jump_location - state.pc - 4;
-
-			switch (arch) {
-			case a_arm:
-				c_emit(a_teq(state.dest_reg));
-				if (op == op_jz) {
-					c_emit(a_b(ac_eq, ofs));
-					printf("  if 0 -> %d", ii->int_param1);
-				} else {
-					c_emit(a_b(ac_ne, ofs));
-					printf("  if 1 -> %d", ii->int_param1);
-				}
-				break;
-			case a_riscv:
-				if (ofs >= -4096 && ofs <= 4095) {
-					/* near jump (branch) */
-					if (op == op_jz) {
-						c_emit(r_nop());
-						c_emit(r_beq(state.dest_reg, r_zero, ofs));
-						printf("  if 0 -> %d", ii->int_param1);
-					} else if (op == op_jnz) {
-						c_emit(r_nop());
-						c_emit(r_bne(state.dest_reg, r_zero, ofs));
-						printf("  if 1 -> %d", ii->int_param1);
-					}
-				} else {
-					/* far jump */
-					if (op == op_jz) {
-						c_emit(r_bne(state.dest_reg, r_zero, 8)); /* skip next instruction */
-						c_emit(r_jal(r_zero, ofs));
-						printf("  if 0 --> %d", ii->int_param1);
-					} else if (op == op_jnz) {
-						c_emit(r_beq(state.dest_reg, r_zero, 8));
-						c_emit(r_jal(r_zero, ofs));
-						printf("  if 1 --> %d", ii->int_param1);
-					}
-				}
-				break;
-			}
+			_backend->op_jz(&state, op, ofs);
+			if (op == op_jz)
+				printf("  if 0 -> %d", ii->int_param1);
+			else
+				printf("  if 1 -> %d", ii->int_param1);
 		} break;
 		case op_generic:
 			c_emit(ii->int_param1);
@@ -592,14 +326,7 @@ void c_generate(arch_t arch)
 			bd = &_blocks[ii->int_param1];
 			if (bd->next_local > 0) {
 				/* reserve stack space for locals */
-				switch (arch) {
-				case a_arm:
-					c_emit(a_add_i(ac_al, a_sp, a_sp, -bd->locals_size));
-					break;
-				case a_riscv:
-					c_emit(r_addi(r_sp, r_sp, -bd->locals_size));
-					break;
-				}
+				_backend->op_block(-bd->locals_size);
 				stack_size += bd->locals_size;
 			}
 			printf("  {");
@@ -609,14 +336,7 @@ void c_generate(arch_t arch)
 			bd = &_blocks[ii->int_param1]; /* should not be necessarry */
 			if (bd->next_local > 0) {
 				/* remove stack space for locals */
-				switch (arch) {
-				case a_arm:
-					c_emit(a_add_i(ac_al, a_sp, a_sp, bd->locals_size));
-					break;
-				case a_riscv:
-					c_emit(r_addi(r_sp, r_sp, bd->locals_size));
-					break;
-				}
+				_backend->op_block(bd->locals_size);
 				stack_size -= bd->locals_size;
 			}
 			/* bd is current block */
@@ -633,80 +353,25 @@ void c_generate(arch_t arch)
 			e_add_symbol(ii->string_param1, strlen(ii->string_param1), state.code_start + state.pc);
 
 			/* create stack space for params and parent frame */
-			switch (arch) {
-			case a_arm:
-				c_emit(a_add_i(ac_al, a_sp, a_sp, -16 - ps));
-				c_emit(a_sw(ac_al, a_s0, a_sp, 12 + ps));
-				c_emit(a_sw(ac_al, a_lr, a_sp, 8 + ps));
-				c_emit(a_add_i(ac_al, a_s0, a_sp, ps));
-				break;
-			case a_riscv:
-				c_emit(r_addi(r_sp, r_sp, -16 - ps));
-				c_emit(r_sw(r_s0, r_sp, 12 + ps));
-				c_emit(r_sw(r_ra, r_sp, 8 + ps));
-				c_emit(r_addi(r_s0, r_sp, ps));
-				break;
-			}
+			_backend->op_entry_point(ps);
 			stack_size = ps;
 
 			/* push parameters on stack */
 			for (pn = 0; pn < fn->num_params; pn++) {
-				switch (arch) {
-				case a_arm:
-					c_emit(a_sw(ac_al, a_r0 + pn, a_s0, -fn->param_defs[pn].offset));
-					break;
-				case a_riscv:
-					c_emit(r_sw(r_a0 + pn, r_s0, -fn->param_defs[pn].offset));
-					break;
-				}
+				_backend->op_store_param(pn, -fn->param_defs[pn].offset);
 			}
 			printf("%s:", ii->string_param1);
 		} break;
 		case op_start:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_lw(ac_al, a_r0, a_sp, 0)); /* argc */
-				c_emit(a_add_i(ac_al, a_r1, a_sp, 4)); /* argv */
-				break;
-			case a_riscv:
-				c_emit(r_lw(r_a0, r_sp, 0)); /* argc */
-				c_emit(r_addi(r_a1, r_sp, 4)); /* argv */
-				break;
-			}
+			_backend->op_start();
 			printf("  start");
 			break;
 		case op_syscall:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_mov_r(ac_al, a_r7, a_r0));
-				c_emit(a_mov_r(ac_al, a_r0, a_r1));
-				c_emit(a_mov_r(ac_al, a_r1, a_r2));
-				c_emit(a_mov_r(ac_al, a_r2, a_r3));
-				c_emit(a_swi());
-				break;
-			case a_riscv:
-				c_emit(r_addi(r_a7, r_a0, 0));
-				c_emit(r_addi(r_a0, r_a1, 0));
-				c_emit(r_addi(r_a1, r_a2, 0));
-				c_emit(r_addi(r_a2, r_a3, 0));
-				c_emit(r_ecall());
-				break;
-			}
+			_backend->op_syscall();
 			printf("  syscall");
 			break;
 		case op_exit:
-			switch (arch) {
-			case a_arm:
-				c_emit(a_mov_i(ac_al, a_r0, 0));
-				c_emit(a_mov_i(ac_al, a_r7, 1));
-				c_emit(a_swi());
-				break;
-			case a_riscv:
-				c_emit(r_addi(r_a0, r_zero, 0));
-				c_emit(r_addi(r_a7, r_zero, 93));
-				c_emit(r_ecall());
-				break;
-			}
+			_backend->op_exit();
 			printf("  exit");
 			break;
 		default:

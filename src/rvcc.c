@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 	printf("Parsed into %d IL instructions\n", _il_idx);
 
 	/* generate code from IL */
-	c_generate(arch);
+	c_generate();
 
 	printf("Compiled into %d code bytes and %d data bytes\n", _e_code_idx, _e_data_idx);
 
