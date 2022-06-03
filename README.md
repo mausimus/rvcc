@@ -69,6 +69,7 @@ To disassemble a RISC-V binary:
 
 To run ARM on x86 you can use [qemu user emulation](https://wiki.debian.org/QemuUserEmulation) through qemu-arm-static.
 
+
 `qemu-arm-static <elf_file>`
 
 To disassemble an ARM binary you can use the GNU toolchain:
